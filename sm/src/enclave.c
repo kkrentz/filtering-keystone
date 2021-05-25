@@ -606,6 +606,7 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
   int attestable;
   struct report report;
   int ret;
+  unsigned char scratchpad[MDSIZE + ATTEST_DATA_MAXLEN];
 
   if (size > ATTEST_DATA_MAXLEN)
     return SBI_ERR_SM_ENCLAVE_ILLEGAL_ARGUMENT;
@@ -636,11 +637,12 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
   sbi_memcpy(report.sm.public_key, sm_public_key, PUBLIC_KEY_SIZE);
   sbi_memcpy(report.sm.signature, sm_signature, SIGNATURE_SIZE);
   sbi_memcpy(report.enclave.hash, enclaves[eid].hash, MDSIZE);
-  sm_sign(report.enclave.signature,
-      &report.enclave,
-      sizeof(struct enclave_report)
-      - SIGNATURE_SIZE
-      - ATTEST_DATA_MAXLEN + size);
+
+  sbi_memcpy(scratchpad, report.enclave.hash, MDSIZE);
+  sbi_memcpy(scratchpad + MDSIZE, report.enclave.data, report.enclave.data_len);
+  if (sm_sign(report.enclave.signature, scratchpad, MDSIZE + report.enclave.data_len)) {
+    goto err_unlock;
+  }
 
   spin_lock(&encl_lock);
 

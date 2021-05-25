@@ -10,6 +10,15 @@
 # Compiler flags
 platform-cppflags-y = -ffunction-sections -fdata-sections
 platform-cflags-y = -I../src -ffunction-sections -fdata-sections
+platform-cflags-y += -DKEYSTONE_SM=1
+platform-cflags-y += -DuECC_BYTES=32
+platform-cflags-y += -DuECC_CURVE=uECC_secp256r1
+platform-cflags-y += -DuECC_SUPPORTS_secp160r1=0
+platform-cflags-y += -DuECC_SUPPORTS_secp192r1=0
+platform-cflags-y += -DuECC_SUPPORTS_secp224r1=0
+platform-cflags-y += -DuECC_SUPPORTS_secp256r1=1
+platform-cflags-y += -DuECC_SUPPORTS_secp256k1=0
+platform-cflags-y += -DuECC_ENABLE_VLI_API=1
 platform-asflags-y =
 platform-ldflags-y = -lc -Wl,--gc-sections
 

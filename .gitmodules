@@ -16,3 +16,6 @@
 [submodule "runtime/test/cmocka"]
         path = runtime/test/cmocka
         url = https://gitlab.com/cmocka/cmocka
+[submodule "micro-ecc"]
+        path = sm/src/micro-ecc
+        url = https://github.com/kkrentz/micro-ecc.git
