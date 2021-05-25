@@ -10,3 +10,9 @@
 [submodule "overlays/microchip"]
 	path = overlays/microchip
 	url = https://github.com/linux4microchip/buildroot-external-microchip
+[submodule "micro-ecc"]
+        path = sm/src/micro-ecc
+        url = https://github.com/kkrentz/micro-ecc.git
+[submodule "sm/src/libcoap"]
+	path = sm/src/libcoap
+	url = https://github.com/kkrentz/libcoap.git
