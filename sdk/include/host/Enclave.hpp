@@ -17,9 +17,6 @@
 #include <iostream>
 
 #include "./common.h"
-extern "C" {
-#include "common/sha3.h"
-}
 #include "ElfFile.hpp"
 #include "Error.hpp"
 #include "KeystoneDevice.hpp"
@@ -37,7 +34,7 @@ class Enclave {
   ElfFile* enclaveFile;
   Memory* pMemory;
   KeystoneDevice* pDevice;
-  char hash[MDSIZE];
+  char hash[32];
   hash_ctx_t hash_ctx;
   uintptr_t runtime_stk_sz;
   void* shared_buffer;

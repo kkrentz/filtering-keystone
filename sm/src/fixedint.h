@@ -5,6 +5,9 @@
 */
 #include <sbi/sbi_types.h>
 
+typedef signed char int8_t;
+typedef short int16_t;
+
 #if ((defined(__STDC__) && __STDC__ && __STDC_VERSION__ >= 199901L) || (defined(__WATCOMC__) && (defined(_STDINT_H_INCLUDED) || __WATCOMC__ >= 1250)) || (defined(__GNUC__) && (defined(_STDINT_H) || defined(_STDINT_H_) || defined(__UINT_FAST64_TYPE__)) )) && !defined(FIXEDINT_H_INCLUDED)
     //#include <stdint.h>
     #define FIXEDINT_H_INCLUDED

@@ -30,6 +30,11 @@ else()
   set(out_dir    ${CMAKE_BINARY_DIR})
 endif()
 
+if (NOT DEFINED ENV{SM_DIR})
+  message(FATAL_ERROR "Please set SM_DIR")
+endif()
+set(SM_DIR $ENV{SM_DIR})
+
 if (${out_dir} STREQUAL ${CMAKE_SOURCE_DIR})
   message(FATAL_ERROR "OUTPUT_DIR must be different from the source path")
 endif()
@@ -57,7 +62,7 @@ use_riscv_toolchain(${BITS})
 ################################################################################
 # BUILD PROJECTS
 ################################################################################
-include_directories(include)
+include_directories(include ${SM_DIR}/src/sha-256)
 add_subdirectory(src)
 install(FILES macros.cmake DESTINATION ${out_dir}/cmake/)
 

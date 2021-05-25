@@ -5,10 +5,10 @@
 #pragma once
 
 extern "C" {
-#include "common/sha3.h"
+#include "sha-256.h"
 }
 
-typedef sha3_ctx_t hash_ctx_t;
+typedef sha_256_context_t hash_ctx_t;
 
 void
 hash_init(hash_ctx_t* hash_ctx);
