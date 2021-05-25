@@ -49,7 +49,7 @@ use_riscv_toolchain(${KEYSTONE_BITS})
 ################################################################################
 # BUILD PROJECTS
 ################################################################################
-include_directories(include)
+include_directories(include $ENV{KEYSTONE_SM}/src)
 add_subdirectory(src)
 install(FILES macros.cmake DESTINATION ${out_dir}/cmake/)
 

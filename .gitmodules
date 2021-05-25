@@ -13,3 +13,9 @@
 [submodule "scripts/ci/utils/relay_ft245r"]
 	path = scripts/ci/utils/relay_ft245r
 	url = https://github.com/vpatron/relay_ft245r
+[submodule "micro-ecc"]
+        path = sm/src/micro-ecc
+        url = https://github.com/kkrentz/micro-ecc.git
+[submodule "sm/src/libcoap"]
+	path = sm/src/libcoap
+	url = https://github.com/kkrentz/libcoap.git
