@@ -57,9 +57,17 @@ static int osm_init(void)
   return region;
 }
 
-void sm_sign(void* signature, const void* data, size_t len)
+int sm_sign(void* signature, const void* data, size_t len)
 {
-  sign(signature, data, len, sm_public_key, sm_private_key);
+  unsigned char md[MDSIZE];
+  hash_ctx ctx;
+  hash_init(&ctx);
+  hash_extend(&ctx, data, len);
+  hash_finalize(md, &ctx);
+  if (!uECC_sign(sm_private_key, md, sizeof(md), signature, uECC_CURVE())) {
+    return -1;
+  }
+  return 0;
 }
 
 int sm_derive_sealing_key(unsigned char *key, const unsigned char *key_ident,
