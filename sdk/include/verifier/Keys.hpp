@@ -12,6 +12,7 @@ typedef unsigned char byte;
 #define MDSIZE 32
 #define SIGNATURE_SIZE 64
 #define PUBLIC_KEY_SIZE 64
+#define PUBLIC_KEY_COMPRESSED_SIZE 33
 
 class PublicKey {
  public:
