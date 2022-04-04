@@ -15,6 +15,7 @@ typedef sha_256_context_t hash_ctx;
 #define SIGNATURE_SIZE (uECC_BYTES * 2)
 #define PRIVATE_KEY_SIZE (uECC_BYTES)
 #define PUBLIC_KEY_SIZE (uECC_BYTES * 2)
+#define PUBLIC_KEY_COMPRESSED_SIZE (1 + uECC_BYTES)
 
 typedef unsigned char byte;
 

@@ -64,8 +64,8 @@ void bootloader() {
 
   // Endorse the SM
   memcpy(scratchpad, sanctum_sm_hash, SHA_256_DIGEST_LENGTH);
-  memcpy(scratchpad + SHA_256_DIGEST_LENGTH, sanctum_sm_public_key, uECC_BYTES * 2);
-  sha_256_hash(scratchpad, SHA_256_DIGEST_LENGTH + uECC_BYTES * 2, md);
+  uECC_compress(sanctum_sm_public_key, scratchpad + SHA_256_DIGEST_LENGTH, uECC_CURVE());
+  sha_256_hash(scratchpad, SHA_256_DIGEST_LENGTH + 1 + uECC_BYTES, md);
   // Sign (H_SM, PK_SM) with SK_D
   if (!uECC_sign(sanctum_dev_secret_key, md, SHA_256_DIGEST_LENGTH, sanctum_sm_signature, uECC_CURVE())) {
     while(1);
