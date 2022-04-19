@@ -70,9 +70,9 @@ int sm_sign(void* signature, const void* data, size_t len)
   return 0;
 }
 
-int sm_derive_sealing_key(unsigned char *key, const unsigned char *key_ident,
-                          size_t key_ident_size,
-                          const unsigned char *enclave_hash)
+void sm_derive_sealing_key(unsigned char *key, const unsigned char *key_ident,
+                           size_t key_ident_size,
+                           const unsigned char *enclave_hash)
 {
   unsigned char info[MDSIZE + key_ident_size];
 
@@ -83,9 +83,9 @@ int sm_derive_sealing_key(unsigned char *key, const unsigned char *key_ident,
    * The key is derived without a salt because we have no entropy source
    * available to generate the salt.
    */
-  return kdf(NULL, 0,
-             (const unsigned char *)sm_private_key, PRIVATE_KEY_SIZE,
-             info, MDSIZE + key_ident_size, key, SEALING_KEY_SIZE);
+  kdf(NULL, 0,
+      (const unsigned char *)sm_private_key, PRIVATE_KEY_SIZE,
+      info, MDSIZE + key_ident_size, key, SEALING_KEY_SIZE);
 }
 
 static void sm_print_hash(void)

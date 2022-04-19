@@ -28,8 +28,8 @@ void hash_extend(hash_ctx* hash_ctx, const void* ptr, size_t len);
 void hash_extend_page(hash_ctx* hash_ctx, const void* ptr);
 void hash_finalize(void* md, hash_ctx* hash_ctx);
 
-int kdf(const unsigned char* salt, size_t salt_len,
-        const unsigned char* ikm, size_t ikm_len,
-        const unsigned char* info, size_t info_len,
-        unsigned char* okm, size_t okm_len);
+void kdf(const unsigned char* salt, size_t salt_len,
+         const unsigned char* ikm, size_t ikm_len,
+         const unsigned char* info, size_t info_len,
+         unsigned char* okm, size_t okm_len);
 #endif /* crypto.h */
