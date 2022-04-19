@@ -663,22 +663,17 @@ err_unlock:
   return ret;
 }
 
-unsigned long get_sealing_key(uintptr_t sealing_key, uintptr_t key_ident,
+void get_sealing_key(uintptr_t sealing_key, uintptr_t key_ident,
                                  size_t key_ident_size, enclave_id eid)
 {
   struct sealing_key *key_struct = (struct sealing_key *)sealing_key;
-  int ret;
 
   /* derive key */
-  ret = sm_derive_sealing_key((unsigned char *)key_struct->key,
+  sm_derive_sealing_key((unsigned char *)key_struct->key,
                               (const unsigned char *)key_ident, key_ident_size,
                               (const unsigned char *)enclaves[eid].hash);
-  if (ret)
-    return SBI_ERR_SM_ENCLAVE_UNKNOWN_ERROR;
 
   /* sign derived key */
   sm_sign((void *)key_struct->signature, (void *)key_struct->key,
           SEALING_KEY_SIZE);
-
-  return SBI_ERR_SM_ENCLAVE_SUCCESS;
 }
