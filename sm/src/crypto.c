@@ -25,11 +25,10 @@ void hash_finalize(void* md, hash_ctx* hash_ctx)
   SHA_256.finalize(hash_ctx, md);
 }
 
-int kdf(const unsigned char* salt, size_t salt_len,
+void kdf(const unsigned char* salt, size_t salt_len,
         const unsigned char* ikm, size_t ikm_len,
         const unsigned char* info, size_t info_len,
         unsigned char* okm, size_t okm_len)
 {
   sha_256_hkdf(salt, salt_len, ikm, ikm_len, info, info_len, okm, okm_len);
-  return 0;
 }
