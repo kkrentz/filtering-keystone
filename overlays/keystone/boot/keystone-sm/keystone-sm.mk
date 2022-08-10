@@ -10,6 +10,8 @@ else
 include $(KEYSTONE)/mkutils/pkg-keystone.mk
 endif
 
+KEYSTONE_SM_CONF_OPTS += -DKEYSTONE_ATTESTATION=${KEYSTONE_ATTESTATION}
+
 # Make the SM depend on the SDK since it contains the shared headers which
 # specifiy the communication protocol between the host <> kernel <> sm <>
 # runtime <> eapp. Consumer firmwares then depend on this target, and thus
