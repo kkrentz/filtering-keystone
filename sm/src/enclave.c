@@ -263,9 +263,23 @@ static unsigned long copy_enclave_data(struct enclave* enclave,
 
 /* copies data into enclave, destination must be inside EPM */
 static unsigned long copy_enclave_report(struct enclave* enclave,
+#if WITH_TRAP
+                                         uintptr_t dest, struct report* source,
+                                         unsigned char fhmqv_key[PRIVATE_KEY_SIZE],
+                                         unsigned char clients_fhmqv_mic[MDSIZE]) {
+  unsigned char buf[2048];
+
+  sbi_memcpy(buf, source, sizeof(struct report));
+  sbi_memset(buf + sizeof(struct report), 0, 2048 - sizeof(struct report) - MDSIZE - PRIVATE_KEY_SIZE);
+  sbi_memcpy(buf + 2048 - PRIVATE_KEY_SIZE, fhmqv_key, PRIVATE_KEY_SIZE);
+  sbi_memcpy(buf + 2048 - PRIVATE_KEY_SIZE - MDSIZE, clients_fhmqv_mic, MDSIZE);
+
+  int illegal = copy_from_sm(dest, buf, sizeof(buf));
+#else /* WITH_TRAP */
                                             uintptr_t dest, struct report* source) {
 
   int illegal = copy_from_sm(dest, source, sizeof(struct report));
+#endif /* WITH_TRAP */
 
   if(illegal)
     return SBI_ERR_SM_ENCLAVE_ILLEGAL_ARGUMENT;
@@ -606,7 +620,12 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
   int attestable;
   struct report report;
   int ret;
+#if WITH_TRAP
+  unsigned char fhmqv_key[PRIVATE_KEY_SIZE];
+  unsigned char clients_fhmqv_mic[MDSIZE];
+#else /* WITH_TRAP */
   unsigned char scratchpad[MDSIZE + ATTEST_DATA_MAXLEN];
+#endif /* WITH_TRAP */
 
   if (size > ATTEST_DATA_MAXLEN)
     return SBI_ERR_SM_ENCLAVE_ILLEGAL_ARGUMENT;
@@ -638,18 +657,38 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
   sbi_memcpy(report.sm.signature, sm_signature, SIGNATURE_SIZE);
   sbi_memcpy(report.enclave.hash, enclaves[eid].hash, MDSIZE);
 
+#if WITH_TRAP
+  if (!report.enclave.data_len) {
+    /* this is for printing hashes at start up */
+    sbi_memset(report.enclave.fhmqv_mic, 0, MDSIZE);
+    sbi_memset(fhmqv_key, 0, sizeof(fhmqv_key));
+  } else if (sm_fhmqv(report.enclave.fhmqv_mic,
+      clients_fhmqv_mic,
+      fhmqv_key,
+      report.enclave.data, report.enclave.data_len,
+      report.enclave.hash)) {
+    goto err_unlock;
+  }
+#else /* WITH_TRAP */
   sbi_memcpy(scratchpad, report.enclave.hash, MDSIZE);
   sbi_memcpy(scratchpad + MDSIZE, report.enclave.data, report.enclave.data_len);
   if (sm_sign(report.enclave.signature, scratchpad, MDSIZE + report.enclave.data_len)) {
     goto err_unlock;
   }
+#endif /* WITH_TRAP */
 
   spin_lock(&encl_lock);
 
   /* copy report to the enclave */
   ret = copy_enclave_report(&enclaves[eid],
       report_ptr,
+#if WITH_TRAP
+      &report,
+      fhmqv_key,
+      clients_fhmqv_mic);
+#else /* WITH_TRAP */
       &report);
+#endif /* WITH_TRAP */
 
   if (ret) {
     ret = SBI_ERR_SM_ENCLAVE_ILLEGAL_ARGUMENT;
