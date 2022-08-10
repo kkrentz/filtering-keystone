@@ -10,6 +10,8 @@
 #include "sm-sbi.h"
 #include <sbi/riscv_encoding.h>
 
+#define WITH_TRAP 1
+
 #define SMM_BASE  0x80000000
 #define SMM_SIZE  0x200000
 
@@ -68,6 +70,13 @@ void sm_init(bool cold_boot);
 /* platform specific functions */
 #define ATTESTATION_KEY_LENGTH  64
 void sm_retrieve_pubkey(void* dest);
+#if WITH_TRAP
+int sm_fhmqv(unsigned char *enclaves_fhmqv_mic,
+    unsigned char *clients_fhmqv_mic,
+    unsigned char *fhmqv_key,
+    unsigned char *data, size_t len,
+    const unsigned char *enclave_hash);
+#endif /* WITH_TRAP */
 int sm_sign(void* sign, const void* data, size_t len);
 void sm_derive_sealing_key(unsigned char *key,
                           const unsigned char *key_ident,
