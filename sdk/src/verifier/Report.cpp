@@ -58,8 +58,13 @@ Report::fromJson(std::string jsonstr) {
   report.enclave.data_len  = json["enclave"]["datalen"].int_value();
   std::string enclave_data = json["enclave"]["data"].string_value();
   HexToBytes(report.enclave.data, report.enclave.data_len, enclave_data);
+#if WITH_TRAP
+  std::string enclave_fhmqv_mic = json["enclave"]["fhmqv_mic"].string_value();
+  HexToBytes(report.enclave.fhmqv_mic, sizeof(report.enclave.fhmqv_mic), enclave_fhmqv_mic);
+#else /* WITH_TRAP */
   std::string enclave_signature = json["enclave"]["signature"].string_value();
   HexToBytes(report.enclave.signature, SIGNATURE_SIZE, enclave_signature);
+#endif /* WITH_TRAP */
 }
 
 void
@@ -88,8 +93,13 @@ Report::stringfy() {
               {"datalen", static_cast<int>(report.enclave.data_len)},
               {"data",
                BytesToHex(report.enclave.data, report.enclave.data_len)},
+#if WITH_TRAP
+              {"fhmqv_mic",
+               BytesToHex(report.enclave.fhmqv_mic, sizeof(report.enclave.fhmqv_mic))},
+#else /* WITH_TRAP */
               {"signature",
                BytesToHex(report.enclave.signature, SIGNATURE_SIZE)},
+#endif /* WITH_TRAP */
           },
       },
   };
@@ -112,8 +122,13 @@ Report::printPretty() {
             << std::endl;
   std::cout << std::endl << "\t\t=== Enclave Application ===" << std::endl;
   std::cout << "Hash: " << BytesToHex(report.enclave.hash, MDSIZE) << std::endl;
+#if WITH_TRAP
+  std::cout << "FHMQV MIC: "
+            << BytesToHex(report.enclave.fhmqv_mic, sizeof(report.enclave.fhmqv_mic))
+#else /* WITH_TRAP */
   std::cout << "Signature: "
             << BytesToHex(report.enclave.signature, SIGNATURE_SIZE)
+#endif /* WITH_TRAP */
             << std::endl;
   std::cout << "Enclave Data: "
             << BytesToHex(report.enclave.data, report.enclave.data_len)
@@ -161,11 +176,15 @@ Report::checkSignaturesOnly(const byte* dev_public_key) {
   sm_valid = uECC_verify(dev_public_key, md, MDSIZE, report.sm.signature, uECC_CURVE());
 
   /* verify Enclave report */
+#if WITH_TRAP
+  enclave_valid = 1;
+#else /* WITH_TRAP */
   uECC_decompress(report.sm.public_key, sm_public_key, uECC_CURVE());
   memcpy(scratchpad, report.enclave.hash, MDSIZE);
   memcpy(scratchpad + MDSIZE, report.enclave.data, report.enclave.data_len);
   SHA_256.hash(scratchpad, MDSIZE + report.enclave.data_len, md);
   enclave_valid = uECC_verify(sm_public_key, md, MDSIZE, report.enclave.signature, uECC_CURVE());
+#endif /* WITH_TRAP */
 
   return sm_valid && enclave_valid;
 }
