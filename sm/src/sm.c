@@ -57,6 +57,88 @@ static int osm_init(void)
   return region;
 }
 
+#if WITH_TRAP
+int sm_fhmqv(struct enclave_report *enclave_report)
+{
+  const uint8_t *spka; /* client's static public key */
+  uint8_t epka[PUBLIC_KEY_SIZE]; /* clients ephemeral public key */
+  uint8_t epkb[PUBLIC_KEY_SIZE];
+  hash_ctx ctx;
+  byte d[MDSIZE];
+  byte e[MDSIZE];
+  uint8_t eskb[PRIVATE_KEY_SIZE];
+  uint8_t sigma[MDSIZE];
+  uint8_t ikm[4 * PUBLIC_KEY_SIZE];
+  uint8_t okm[2 * MDSIZE];
+  sha_256_hmac_context_t hmac_ctx;
+
+  if (enclave_report->data_len
+      != (PUBLIC_KEY_SIZE + PUBLIC_KEY_COMPRESSED_SIZE)) {
+    return -1;
+  }
+  spka = enclave_report->data;
+  uECC_decompress(enclave_report->data + PUBLIC_KEY_SIZE, epka, uECC_CURVE());
+  if (!uECC_make_key(epkb, eskb, uECC_CURVE())) {
+    return -1;
+  }
+  uECC_compress(epkb,
+                enclave_report->ephemeral_public_key_compressed,
+                uECC_CURVE());
+
+  hash_init(&ctx);
+  hash_extend(&ctx, epka, sizeof(epka));
+  hash_extend(&ctx, epkb, sizeof(epkb));
+  hash_extend(&ctx, spka, PUBLIC_KEY_SIZE);
+  hash_extend(&ctx, sm_public_key, sizeof(sm_public_key));
+
+  hash_finalize(d, &ctx);
+  sbi_memcpy(e + (sizeof(e) / 2), d, sizeof(e) / 2);
+  sbi_memset(e, 0, sizeof(e) / 2);
+  sbi_memset(d, 0, sizeof(d) / 2);
+
+  if (!uECC_shared_fhmqv_secret(sigma,
+                                sm_private_key,
+                                eskb,
+                                spka,
+                                epka,
+                                e,
+                                d,
+                                uECC_CURVE())) {
+    return -1;
+  }
+  sbi_memcpy(ikm, spka, PUBLIC_KEY_SIZE);
+  sbi_memcpy(ikm + PUBLIC_KEY_SIZE,
+             sm_public_key,
+             sizeof(sm_public_key));
+  sbi_memcpy(ikm + PUBLIC_KEY_SIZE + sizeof(sm_public_key),
+             epka,
+             sizeof(epka));
+  sbi_memcpy(ikm + PUBLIC_KEY_SIZE + sizeof(sm_public_key) + sizeof(epka),
+             epkb,
+             sizeof(epkb));
+  kdf(
+      NULL, 0, /* TODO use salt */
+      sigma, sizeof(sigma),
+      ikm, sizeof(ikm),
+      okm, sizeof(okm));
+  sbi_memcpy(enclave_report->fhmqv_key,
+             okm + sizeof(okm) / 2,
+             sizeof(okm) / 2);
+  sha_256_hmac_init(&hmac_ctx, okm, sizeof(okm) / 2);
+  sha_256_hmac_update(&hmac_ctx, sm_public_key, sizeof(sm_public_key));
+  sha_256_hmac_update(&hmac_ctx, epkb, sizeof(epkb));
+  sha_256_hmac_update(&hmac_ctx,
+                      enclave_report->hash,
+                      sizeof(enclave_report->hash));
+  sha_256_hmac_finish(&hmac_ctx, enclave_report->servers_fhmqv_mic);
+  sha_256_hmac_init(&hmac_ctx, okm, sizeof(okm) / 2);
+  sha_256_hmac_update(&hmac_ctx, spka, PUBLIC_KEY_SIZE);
+  sha_256_hmac_update(&hmac_ctx, epka, sizeof(epka));
+  sha_256_hmac_finish(&hmac_ctx, enclave_report->clients_fhmqv_mic);
+  return 0;
+}
+#endif /* WITH_TRAP */
+
 int sm_sign(void* signature, byte digest[MDSIZE])
 {
   if (!uECC_sign(sm_private_key, digest, MDSIZE, signature, uECC_CURVE())) {
