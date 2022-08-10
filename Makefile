@@ -27,6 +27,7 @@ export BUILDROOT_BUILDDIR       ?= $(BUILDDIR)/buildroot.build
 # options: generic, cva6, hifive_unmatched, mpfs
 export KEYSTONE_PLATFORM        ?= generic
 export KEYSTONE_BITS            ?= 64
+export KEYSTONE_ATTESTATION     ?= trap
 
 include mkutils/args.mk
 include mkutils/log.mk
