@@ -32,6 +32,15 @@ message(" *** Install path: ${out_dir}")
 # Program and flags
 #-------------------------------------------------------------------------------
 
+if (KEYSTONE_ATTESTATION STREQUAL "sigma")
+    string(APPEND CMAKE_C_FLAGS "-DWITH_TRAP=0")
+    string(APPEND CMAKE_CXX_FLAGS "-DWITH_TRAP=0")
+elseif (KEYSTONE_ATTESTATION STREQUAL "trap")
+    string(APPEND CMAKE_C_FLAGS "-DWITH_TRAP=1")
+    string(APPEND CMAKE_CXX_FLAGS "-DWITH_TRAP=1")
+else()
+    message(FATAL_ERROR "KEYSTONE_ATTESTATION must either be sigma or trap instead of ${KEYSTONE_ATTESTATION}")
+endif()
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE    "Debug")

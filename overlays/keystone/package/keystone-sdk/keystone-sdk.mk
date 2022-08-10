@@ -14,7 +14,8 @@ endif
 export KEYSTONE_SDK_DIR=$(HOST_DIR)/usr/share/keystone/sdk
 
 HOST_KEYSTONE_SDK_CONF_OPTS += -DKEYSTONE_SDK_DIR=$(KEYSTONE_SDK_DIR) \
-                                 -DKEYSTONE_BITS=${KEYSTONE_BITS}
+                                 -DKEYSTONE_BITS=${KEYSTONE_BITS} \
+                                 -DKEYSTONE_ATTESTATION=${KEYSTONE_ATTESTATION}
 HOST_KEYSTONE_SDK_DEPENDENCIES += toolchain
 
 # Clean dependant packages if we clean this one
