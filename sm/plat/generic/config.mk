@@ -22,3 +22,11 @@ platform-cflags-y += -DKEYSTONE_SM=1 \
                      -DuECC_SUPPORTS_secp256r1=1 \
                      -DuECC_SUPPORTS_secp256k1=0 \
                      -DuECC_ENABLE_VLI_API=1
+
+ifeq ($(KEYSTONE_ATTESTATION),sigma)
+platform-cflags-y += -DWITH_TRAP=0
+else ifeq ($(KEYSTONE_ATTESTATION),trap)
+platform-cflags-y += -DWITH_TRAP=1
+else
+$(error KEYSTONE_ATTESTATION must either be sigma or trap)
+endif
