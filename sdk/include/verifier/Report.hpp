@@ -9,11 +9,19 @@
 #include "Keys.hpp"
 #include "verifier/json11.h"
 
+#ifndef WITH_TRAP
+#define WITH_TRAP 1
+#endif
+
 struct enclave_report_t {
   byte hash[MDSIZE];
   uint64_t data_len;
   byte data[ATTEST_DATA_MAXLEN];
+#if WITH_TRAP
+  byte fhmqv_mic[MDSIZE];
+#else /* WITH_TRAP */
   byte signature[SIGNATURE_SIZE];
+#endif /* WITH_TRAP */
 };
 
 struct sm_report_t {

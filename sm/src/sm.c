@@ -58,6 +58,82 @@ int osm_init()
   return region;
 }
 
+#if WITH_TRAP
+int sm_fhmqv(unsigned char *enclaves_fhmqv_mic,
+    unsigned char *clients_fhmqv_mic,
+    unsigned char *fhmqv_key,
+    unsigned char *data, size_t len,
+    const unsigned char *enclave_hash)
+{
+  const uint8_t *spka; /* client's static public key */
+  uint8_t epka[PUBLIC_KEY_SIZE]; /* clients ephemeral public key */
+  uint8_t epkb[PUBLIC_KEY_SIZE];
+  sha_256_context_t ctx;
+  byte d[MDSIZE];
+  byte e[MDSIZE];
+  uint8_t eskb[PRIVATE_KEY_SIZE];
+  uint8_t sigma[MDSIZE];
+  uint8_t ikm[4 * PUBLIC_KEY_SIZE];
+  uint8_t okm[2 * MDSIZE];
+  uint8_t auth_data[2 * PUBLIC_KEY_SIZE + MDSIZE];
+
+  if (len != (PUBLIC_KEY_SIZE + 2 * PUBLIC_KEY_COMPRESSED_SIZE)) {
+    return -1;
+  }
+  spka = data;
+  data += PUBLIC_KEY_SIZE;
+  len -= PUBLIC_KEY_SIZE;
+  uECC_decompress(data, epka, uECC_CURVE());
+  data += PUBLIC_KEY_COMPRESSED_SIZE;
+  len -= PUBLIC_KEY_COMPRESSED_SIZE;
+  if (!uECC_make_key(epkb, eskb, uECC_CURVE())) {
+    return -1;
+  }
+  uECC_compress(epkb, data, uECC_CURVE());
+  data += PUBLIC_KEY_COMPRESSED_SIZE;
+  len -= PUBLIC_KEY_COMPRESSED_SIZE;
+
+  SHA_256.init(&ctx);
+  SHA_256.update(&ctx, epka, PUBLIC_KEY_SIZE);
+  SHA_256.update(&ctx, epkb, PUBLIC_KEY_SIZE);
+  SHA_256.update(&ctx, spka, PUBLIC_KEY_SIZE);
+  SHA_256.update(&ctx, sm_public_key, PUBLIC_KEY_SIZE);
+
+  SHA_256.finalize(&ctx, d);
+  sbi_memcpy(e + MDSIZE / 2, d, MDSIZE / 2);
+  sbi_memset(e, 0, MDSIZE / 2);
+  sbi_memset(d, 0, MDSIZE / 2);
+
+  if(!uECC_shared_fhmqv_secret(sigma,
+      sm_private_key,
+      eskb,
+      spka,
+      epka,
+      e,
+      d,
+      uECC_CURVE())) {
+    return -1;
+  }
+  sbi_memcpy(ikm, spka, PUBLIC_KEY_SIZE);
+  sbi_memcpy(ikm + PUBLIC_KEY_SIZE, sm_public_key, PUBLIC_KEY_SIZE);
+  sbi_memcpy(ikm + 2 * PUBLIC_KEY_SIZE, epka, PUBLIC_KEY_SIZE);
+  sbi_memcpy(ikm + 3 * PUBLIC_KEY_SIZE, epkb, PUBLIC_KEY_SIZE);
+  sha_256_hkdf(NULL, 0, /* TODO use salt */
+      sigma, sizeof(sigma),
+      ikm, sizeof(ikm),
+      okm, sizeof(okm));
+  sbi_memcpy(fhmqv_key, okm + MDSIZE, MDSIZE);
+  sbi_memcpy(auth_data, sm_public_key, PUBLIC_KEY_SIZE);
+  sbi_memcpy(auth_data + PUBLIC_KEY_SIZE, epkb, PUBLIC_KEY_SIZE);
+  sbi_memcpy(auth_data + 2 * PUBLIC_KEY_SIZE, enclave_hash, MDSIZE);
+  sha_256_hmac(okm, MDSIZE, auth_data, sizeof(auth_data), enclaves_fhmqv_mic);
+  sbi_memcpy(auth_data, spka, PUBLIC_KEY_SIZE);
+  sbi_memcpy(auth_data + PUBLIC_KEY_SIZE, epka, PUBLIC_KEY_SIZE);
+  sha_256_hmac(okm, MDSIZE, auth_data, 2 * PUBLIC_KEY_SIZE, clients_fhmqv_mic);
+  return 0;
+}
+#endif /* WITH_TRAP */
+
 int sm_sign(void* signature, const void* data, size_t len)
 {
   unsigned char md[MDSIZE];
