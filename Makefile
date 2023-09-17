@@ -15,6 +15,7 @@ export KEYSTONE_RUNTIME         ?= $(KEYSTONE)/runtime
 export KEYSTONE_SDK             ?= $(KEYSTONE)/sdk
 export KEYSTONE_BOOTROM         ?= $(KEYSTONE)/bootrom
 export KEYSTONE_SM              ?= $(KEYSTONE)/sm
+export FILTERING_PROXY          ?= $(PROXY_DIR)
 
 export BUILDDIR                 ?= $(KEYSTONE)/build-$(KEYSTONE_PLATFORM)$(KEYSTONE_BITS)
 export BUILDROOT_OVERLAYDIR     ?= $(BUILDDIR)/overlay
