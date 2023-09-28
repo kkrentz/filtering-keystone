@@ -1,17 +1,8 @@
 #!/bin/sh
 
-export HOST_PORT=@qemu_ssh_port@;
-
-echo "**** Running QEMU SSH on port ${HOST_PORT} ****";
-
 export SMP=1;
 
 while [ "$1" != "" ]; do
-    if [ "$1" = "-debug" ];
-    then
-        echo "**** GDB port $((HOST_PORT + 1)) ****";
-        DEBUG="-gdb tcp::$((HOST_PORT + 1)) -S -d in_asm -D debug.log";
-    fi;
     if [ "$1" = "-smp" ];
     then
         SMP="$2";
@@ -20,7 +11,7 @@ while [ "$1" != "" ]; do
     shift;
 done;
 
-@qemu_system@ \
+sudo @qemu_system@ \
  $DEBUG \
  -m 2G \
  -nographic \
@@ -28,7 +19,7 @@ done;
  -bios @fw_elf@ \
  -kernel @linux_image@ \
  @extra_qemu_options@ \
- -netdev user,id=net0,net=192.168.100.1/24,dhcpstart=192.168.100.128,hostfwd=tcp::${HOST_PORT}-:22 \
+ -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
  -device virtio-net-device,netdev=net0 \
  -device virtio-rng-pci \
  -smp $SMP
