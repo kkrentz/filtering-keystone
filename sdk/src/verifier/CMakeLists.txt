@@ -3,11 +3,6 @@ project(keystone-verifier C CXX)
 set(CFLAGS      "-Wall -Werror")
 set(LDFLAGS     "-static")
 
-if (NOT DEFINED ENV{SM_DIR})
-  message(FATAL_ERROR "Please set SM_DIR")
-endif()
-set(SM_DIR $ENV{SM_DIR})
-
 add_compile_definitions(
   uECC_BYTES=32
   uECC_CURVE=uECC_secp256r1
@@ -22,10 +17,10 @@ set(SOURCE_FILES
     json11.cpp
     keys.cpp
     Report.cpp
-    ${SM_DIR}/src/micro-ecc/uECC.c
+    $ENV{KEYSTONE_SM}/src/micro-ecc/uECC.c
     )
 
-set(INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/include/verifier ${SM_DIR}/src/micro-ecc)
+set(INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/include/verifier $ENV{KEYSTONE_SM}/src/micro-ecc)
 
 set(CMAKE_C_FLAGS          "${CMAKE_C_FLAGS} ${CFLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LDFLAGS}")

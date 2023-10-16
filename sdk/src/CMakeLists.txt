@@ -6,13 +6,13 @@ set(enabled_libmodules      app edge host verifier)
 # Common
 file(GLOB_RECURSE
   COMMON_SOURCE_FILES
-  ${SM_DIR}/src/sha-256/sha-256.c)
+  $ENV{KEYSTONE_SM}/src/sha-256/sha-256.c)
 
 foreach(module ${enabled_libmodules})
     add_subdirectory(${module})
 endforeach()
 
-install(FILES ${SM_DIR}/src/sha-256/sha-256.h
+install(FILES $ENV{KEYSTONE_SM}/src/sha-256/sha-256.h
   DESTINATION ${out_dir}/include)
 
 

@@ -38,11 +38,11 @@ bootrom_sources = \
 	./bootloader.S \
 	./bootloader.c \
 	string.c \
-	${SM_DIR}/src/micro-ecc/uECC.c \
-	${SM_DIR}/src/sha-256/sha-256.c
+	${KEYSTONE_SM}/src/micro-ecc/uECC.c \
+	${KEYSTONE_SM}/src/sha-256/sha-256.c
 
 %.elf: $(bootrom_sources) bootloader.lds
-	$(CC) $(CFLAGS) -I./ -I${SM_DIR}/src/micro-ecc/ -I${SM_DIR}/src/sha-256/ -L . -T bootloader.lds -o $@ $(bootrom_sources)
+	$(CC) $(CFLAGS) -I./ -I${KEYSTONE_SM}/src/micro-ecc/ -I${KEYSTONE_SM}/src/sha-256/ -L . -T bootloader.lds -o $@ $(bootrom_sources)
 
 %.bin: %.elf
 	$(OBJCOPY) -O binary --only-section=.text $< $@;
