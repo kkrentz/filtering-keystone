@@ -47,11 +47,13 @@ Report::fromJson(std::string jsonstr) {
 
   std::string sm_hash = json["security_monitor"]["hash"].string_value();
   HexToBytes(report.sm.hash, MDSIZE, sm_hash);
+#if !WITH_TINY_DICE
   std::string sm_pubkey = json["security_monitor"]["pubkey"].string_value();
   HexToBytes(report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE, sm_pubkey);
   std::string sm_signature =
       json["security_monitor"]["signature"].string_value();
   HexToBytes(report.sm.signature, SIGNATURE_SIZE, sm_signature);
+#endif /* !WITH_TINY_DICE */
 
   std::string enclave_hash = json["enclave"]["hash"].string_value();
   HexToBytes(report.enclave.hash, MDSIZE, enclave_hash);
@@ -83,8 +85,12 @@ Report::stringfy() {
           "security_monitor",
           Json::object{
               {"hash", BytesToHex(report.sm.hash, MDSIZE)},
+#if WITH_TINY_DICE
+              {"cert", BytesToHex(report.sm.cert_chain, report.sm.cert_chain_size)}},
+#else /* WITH_TINY_DICE */
               {"pubkey", BytesToHex(report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE)},
               {"signature", BytesToHex(report.sm.signature, SIGNATURE_SIZE)}},
+#endif /* WITH_TINY_DICE */
       },
       {
           "enclave",
@@ -116,10 +122,12 @@ void
 Report::printPretty() {
   std::cout << "\t\t=== Security Monitor ===" << std::endl;
   std::cout << "Hash: " << BytesToHex(report.sm.hash, MDSIZE) << std::endl;
+#if !WITH_TINY_DICE
   std::cout << "Pubkey: " << BytesToHex(report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE)
             << std::endl;
   std::cout << "Signature: " << BytesToHex(report.sm.signature, SIGNATURE_SIZE)
             << std::endl;
+#endif /* !WITH_TINY_DICE */
   std::cout << std::endl << "\t\t=== Enclave Application ===" << std::endl;
   std::cout << "Hash: " << BytesToHex(report.enclave.hash, MDSIZE) << std::endl;
 #if WITH_TRAP
@@ -170,10 +178,14 @@ Report::checkSignaturesOnly(const byte* dev_public_key) {
   uint8_t sm_public_key[PUBLIC_KEY_SIZE];
 
   /* verify SM report */
+#if WITH_TINY_DICE
+  sm_valid = 1;
+#else /* WITH_TINY_DICE */
   memcpy(scratchpad, report.sm.hash, MDSIZE);
   memcpy(scratchpad + MDSIZE, report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE);
   SHA_256.hash(scratchpad, MDSIZE + PUBLIC_KEY_COMPRESSED_SIZE, md);
   sm_valid = uECC_verify(dev_public_key, md, MDSIZE, report.sm.signature, uECC_CURVE());
+#endif /* WITH_TINY_DICE */
 
   /* verify Enclave report */
 #if WITH_TRAP

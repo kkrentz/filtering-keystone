@@ -2,5 +2,10 @@
 #define __ATTESTATION_H__
 
 #define WITH_TRAP 1
+#define WITH_TINY_DICE 1
+#define TINY_DICE_UDS_SIZE 32
+#define TINY_DICE_CDI_SIZE 32
+#define TINY_DICE_TCI_SIZE 32
+#define TINY_DICE_MAX_CERT_CHAIN_SIZE 256
 
 #endif  // __ATTESTATION_H__

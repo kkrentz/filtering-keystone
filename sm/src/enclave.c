@@ -653,8 +653,13 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
 
   sbi_memcpy(report.dev_public_key, dev_public_key, PUBLIC_KEY_SIZE);
   sbi_memcpy(report.sm.hash, sm_hash, MDSIZE);
+#if WITH_TINY_DICE
+  sbi_memcpy(report.sm.cert_chain, sm_cert_chain, TINY_DICE_MAX_CERT_CHAIN_SIZE);
+  report.sm.cert_chain_size = sm_cert_chain_size;
+#else /* WITH_TINY_DICE */
   uECC_compress(sm_public_key, report.sm.public_key, uECC_CURVE());
   sbi_memcpy(report.sm.signature, sm_signature, SIGNATURE_SIZE);
+#endif /* !WITH_TINY_DICE */
   sbi_memcpy(report.enclave.hash, enclaves[eid].hash, MDSIZE);
 
 #if WITH_TRAP

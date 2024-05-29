@@ -92,8 +92,13 @@ struct enclave_report
 struct sm_report
 {
   byte hash[MDSIZE];
+#if WITH_TINY_DICE
+  byte cert_chain[TINY_DICE_MAX_CERT_CHAIN_SIZE];
+  uint32_t cert_chain_size;
+#else /* WITH_TINY_DICE */
   byte public_key[PUBLIC_KEY_COMPRESSED_SIZE];
   byte signature[SIGNATURE_SIZE];
+#endif /* WITH_TINY_DICE */
 };
 struct report
 {

@@ -15,6 +15,9 @@
 #include <sbi/riscv_barrier.h>
 #include <sbi/sbi_console.h>
 #include <sbi/sbi_hart.h>
+#include "coap3/coap_internal.h"
+#include "micro-ecc/uECC.h"
+#include "sm_assert.h"
 
 static int sm_init_done = 0;
 static int sm_region_id = 0, os_region_id = 0;
@@ -27,7 +30,15 @@ static int sm_region_id = 0, os_region_id = 0;
 #include TARGET_PLATFORM_HEADER
 
 byte sm_hash[MDSIZE] = { 0, };
+#if WITH_TINY_DICE
+byte sm_cdi_l0[TINY_DICE_CDI_SIZE];
+byte sm_cert_chain[TINY_DICE_MAX_CERT_CHAIN_SIZE];
+uint32_t sm_cert_chain_size;
+byte dev_secret_key[PRIVATE_KEY_SIZE] = { 0, };
+static uint32_t deterministic_rng_counter;
+#else /* WITH_TINY_DICE */
 byte sm_signature[SIGNATURE_SIZE] = { 0, };
+#endif /* WITH_TINY_DICE */
 byte sm_public_key[PUBLIC_KEY_SIZE] = { 0, };
 byte sm_private_key[PRIVATE_KEY_SIZE] = { 0, };
 byte dev_public_key[PUBLIC_KEY_SIZE] = { 0, };
@@ -198,6 +209,124 @@ void sm_print_cert()
 }
 */
 
+#if WITH_TINY_DICE
+static int
+deterministic_rng(uint8_t *dest, unsigned size)
+{
+  sha_256_hkdf(NULL, 0,
+               sm_cdi_l0, sizeof(sm_cdi_l0),
+               (const uint8_t *)&deterministic_rng_counter,
+               sizeof(deterministic_rng_counter),
+               dest, size);
+  deterministic_rng_counter++;
+  return 1;
+}
+
+static int
+encode_and_hash(
+    uint8_t certificate_hash[uECC_BYTES],
+    const uint8_t reconstruction_data[uECC_BYTES * 2],
+    void *ptr)
+{
+  tiny_dice_cert_t cert;
+  cbor_writer_state_t state;
+  const uint8_t *tail;
+  const uint8_t *head;
+
+  tiny_dice_clear_cert(&cert);
+  uECC_compress(reconstruction_data,
+                cert.compressed_reconstruction_data,
+                uECC_CURVE());
+  cert.tci_digest = sm_hash;
+
+  cbor_init_writer(&state, sm_cert_chain, sizeof(sm_cert_chain));
+  tail = cbor_open_array(&state);
+
+  /* write Cert_L1 */
+  head = tiny_dice_prepend_cert(&state, &cert);
+  if (!head) {
+    return 1;
+  }
+
+  /* hash Cert_L1 */
+  SHA_256.hash(head, tail - head, ptr);
+  sbi_memcpy(certificate_hash, ptr, SHA_256_DIGEST_LENGTH);
+
+  /* wrap up certificate chain */
+  head = cbor_wrap_array(&state);
+  if (!head) {
+    return 1;
+  }
+  sm_cert_chain_size = tail - head;
+  sbi_memmove(sm_cert_chain, head, sm_cert_chain_size);
+  return 0;
+}
+
+void init_tiny_dice(void)
+{
+  deterministic_rng_counter = 0;
+  uECC_set_rng(deterministic_rng);
+
+  /* generate DeviceID */
+  if(!uECC_make_key(dev_public_key,
+                    dev_secret_key,
+                    uECC_CURVE())) {
+    sbi_printf("failed to generate DeviceID\n");
+    sbi_hart_hang();
+  }
+
+  /* generate proto-AKey_L0 */
+  uint8_t proto_akey_l0_public_key[uECC_BYTES * 2];
+  uint8_t proto_akey_l0_secret_key[uECC_BYTES];
+  if (!uECC_make_key(proto_akey_l0_public_key,
+                     proto_akey_l0_secret_key,
+                     uECC_CURVE())) {
+    sbi_printf("failed to generate proto-AKey_L0\n");
+    sbi_hart_hang();
+  }
+
+  /* issue tinyDICE certificate */
+  uint8_t public_key_reconstruction_data[uECC_BYTES * 2];
+  uint8_t private_key_reconstruction_data[uECC_BYTES];
+  uint8_t certificate_hash[SHA_256_DIGEST_LENGTH];
+  if (!uECC_generate_ecqv_certificate(public_key_reconstruction_data,
+                                      private_key_reconstruction_data,
+                                      proto_akey_l0_public_key,
+                                      dev_secret_key,
+                                      encode_and_hash,
+                                      certificate_hash,
+                                      uECC_CURVE())) {
+    sbi_printf("failed to issue tinyDICE certificate\n");
+    sbi_hart_hang();
+  }
+
+  /* generate AKey_L0 (= sm_private_key/sm_public_key) */
+  if (!uECC_generate_ecqv_key_pair(sm_private_key,
+                                   sm_public_key,
+                                   proto_akey_l0_secret_key,
+                                   certificate_hash,
+                                   SHA_256_DIGEST_LENGTH,
+                                   private_key_reconstruction_data,
+                                   uECC_CURVE())) {
+    sbi_printf("failed to generate AKey_L0\n");
+    sbi_hart_hang();
+  }
+
+  uint8_t restored_public_key[PUBLIC_KEY_SIZE];
+  sm_assert(uECC_restore_ecqv_public_key(restored_public_key,
+                                         certificate_hash,
+                                         SHA_256_DIGEST_LENGTH,
+                                         public_key_reconstruction_data,
+                                         dev_public_key,
+                                         uECC_CURVE()));
+  sm_assert(!sbi_memcmp(restored_public_key,
+                        sm_public_key,
+                        sizeof(restored_public_key)));
+
+  uECC_set_rng(rng);
+}
+#endif /* WITH_TINY_DICE */
+
 void sm_init(bool cold_boot)
 {
 	// initialize SMM
@@ -250,7 +379,11 @@ void sm_init(bool cold_boot)
     sbi_hart_hang();
   }
 
+#if WITH_TINY_DICE
+  init_tiny_dice();
+#else /* WITH_TINY_DICE */
   uECC_set_rng(rng);
+#endif /* WITH_TINY_DICE */
 
   sbi_printf("[SM] Keystone security monitor has been initialized!\n");
 

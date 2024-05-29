@@ -9,6 +9,7 @@ keystone-sm-headers += sm_assert.h cpu.h enclave.h ipi.h mprv.h page.h platform-
 # Crypto headers
 ifneq ($(KEYSTONE_SM_NO_CRYPTO),y)
 keystone-sm-headers += crypto.h micro-ecc/uECC.h coap3/coap_internal.h libcoap/src/oscore-ng/oscore_ng_sha_256.h
+keystone-sm-headers += libcoap/src/oscore-ng/oscore_ng_tiny_dice.h libcoap/src/oscore-ng/oscore_ng_cbor.h
 endif
 
 # Platform headers
@@ -37,6 +38,7 @@ keystone-sm-sources += attest.c cpu.c enclave.c pmp.c sm.c sm-sbi.c sm-sbi-opens
 # Crypto
 ifneq ($(KEYSTONE_SM_NO_CRYPTO),y)
 keystone-sm-sources += crypto.c micro-ecc/uECC.c libcoap/src/oscore-ng/oscore_ng_sha_256.c
+keystone-sm-sources += libcoap/src/oscore-ng/oscore_ng_tiny_dice.c libcoap/src/oscore-ng/oscore_ng_cbor.c
 endif
 
 # Platform

@@ -48,6 +48,7 @@ bootrom_sources = \
 		-I./ \
 		-I${KEYSTONE_SM}/src/micro-ecc/ \
 		-I${KEYSTONE_SM}/src/ \
+		-I${KEYSTONE_SDK}/include/shared/ \
 		-L . \
 		-T bootloader.lds \
 		-o $@ $(bootrom_sources)
