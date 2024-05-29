@@ -1,5 +1,6 @@
 //******************************************************************************
 // Copyright (c) 2018, The Regents of the University of California (Regents).
+// Copyright (c) 2025, Siemens AG.
 // All Rights Reserved. See LICENSE for license details.
 //------------------------------------------------------------------------------
 #include <Report.hpp>
@@ -47,26 +48,28 @@ Report::fromJson(std::string jsonstr) {
 
   std::string sm_hash = json["security_monitor"]["hash"].string_value();
   HexToBytes(report.sm.hash, MDSIZE, sm_hash);
+#if !WITH_TINY_DICE
   std::string sm_pubkey = json["security_monitor"]["pubkey"].string_value();
   HexToBytes(report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE, sm_pubkey);
   std::string sm_signature =
       json["security_monitor"]["signature"].string_value();
   HexToBytes(report.sm.signature, SIGNATURE_SIZE, sm_signature);
+#endif /* !WITH_TINY_DICE */
 
   std::string enclave_hash = json["enclave"]["hash"].string_value();
   HexToBytes(report.enclave.hash, MDSIZE, enclave_hash);
   report.enclave.data_len  = json["enclave"]["datalen"].int_value();
   std::string enclave_data = json["enclave"]["data"].string_value();
   HexToBytes(report.enclave.data, report.enclave.data_len, enclave_data);
-#if WITH_TRAP
+#if WITH_FHMQVC
   std::string servers_fhmqv_mic = json["enclave"]["servers_fhmqv_mic"].string_value();
   HexToBytes(report.enclave.servers_fhmqv_mic, sizeof(report.enclave.servers_fhmqv_mic), servers_fhmqv_mic);
   std::string clients_fhmqv_mic = json["enclave"]["clients_fhmqv_mic"].string_value();
   HexToBytes(report.enclave.clients_fhmqv_mic, sizeof(report.enclave.clients_fhmqv_mic), clients_fhmqv_mic);
-#else /* WITH_TRAP */
+#elif !WITH_FHMQV
   std::string enclave_signature = json["enclave"]["signature"].string_value();
   HexToBytes(report.enclave.signature, SIGNATURE_SIZE, enclave_signature);
-#endif /* WITH_TRAP */
+#endif /* !WITH_FHMQV */
 }
 
 void
@@ -85,8 +88,12 @@ Report::stringfy() {
           "security_monitor",
           Json::object{
               {"hash", BytesToHex(report.sm.hash, MDSIZE)},
+#if WITH_TINY_DICE
+              {"cert", BytesToHex(report.sm.cert_chain, report.sm.cert_chain_size)}},
+#else /* WITH_TINY_DICE */
               {"pubkey", BytesToHex(report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE)},
               {"signature", BytesToHex(report.sm.signature, SIGNATURE_SIZE)}},
+#endif /* WITH_TINY_DICE */
       },
       {
           "enclave",
@@ -95,15 +102,15 @@ Report::stringfy() {
               {"datalen", static_cast<int>(report.enclave.data_len)},
               {"data",
                BytesToHex(report.enclave.data, report.enclave.data_len)},
-#if WITH_TRAP
+#if WITH_FHMQVC
               {"servers_fhmqv_mic",
                BytesToHex(report.enclave.servers_fhmqv_mic, sizeof(report.enclave.servers_fhmqv_mic))},
               {"clients_fhmqv_mic",
                BytesToHex(report.enclave.clients_fhmqv_mic, sizeof(report.enclave.clients_fhmqv_mic))},
-#else /* WITH_TRAP */
+#elif !WITH_FHMQV
               {"signature",
                BytesToHex(report.enclave.signature, SIGNATURE_SIZE)},
-#endif /* WITH_TRAP */
+#endif /* !WITH_FHMQV */
           },
       },
   };
@@ -120,23 +127,26 @@ void
 Report::printPretty() {
   std::cout << "\t\t=== Security Monitor ===" << std::endl;
   std::cout << "Hash: " << BytesToHex(report.sm.hash, MDSIZE) << std::endl;
+#if !WITH_TINY_DICE
   std::cout << "Pubkey: " << BytesToHex(report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE)
             << std::endl;
   std::cout << "Signature: " << BytesToHex(report.sm.signature, SIGNATURE_SIZE)
             << std::endl;
+#endif /* !WITH_TINY_DICE */
   std::cout << std::endl << "\t\t=== Enclave Application ===" << std::endl;
   std::cout << "Hash: " << BytesToHex(report.enclave.hash, MDSIZE) << std::endl;
-#if WITH_TRAP
+#if WITH_FHMQVC
   std::cout << "Server's FHMQV MIC: "
             << BytesToHex(report.enclave.servers_fhmqv_mic, sizeof(report.enclave.servers_fhmqv_mic))
             << std::endl;
   std::cout << "Client's FHMQV MIC: "
             << BytesToHex(report.enclave.clients_fhmqv_mic, sizeof(report.enclave.clients_fhmqv_mic))
-#else /* WITH_TRAP */
+            << std::endl;
+#elif !WITH_FHMQV
   std::cout << "Signature: "
             << BytesToHex(report.enclave.signature, SIGNATURE_SIZE)
-#endif /* WITH_TRAP */
             << std::endl;
+#endif /* !WITH_FHMQV */
   std::cout << "Enclave Data: "
             << BytesToHex(report.enclave.data, report.enclave.data_len)
             << std::endl;
@@ -177,17 +187,21 @@ Report::checkSignaturesOnly(const byte* dev_public_key) {
   uint8_t sm_public_key[PUBLIC_KEY_SIZE];
 
   /* verify SM report */
+#if WITH_TINY_DICE
+  sm_valid = 1;
+#else /* WITH_TINY_DICE */
   memcpy(scratchpad, report.sm.hash, MDSIZE);
   memcpy(scratchpad + MDSIZE, report.sm.public_key, PUBLIC_KEY_COMPRESSED_SIZE);
   if (!SHA_256.hash(scratchpad, MDSIZE + PUBLIC_KEY_COMPRESSED_SIZE, md)) {
     return 0;
   }
   sm_valid = uECC_verify(dev_public_key, md, MDSIZE, report.sm.signature, uECC_CURVE());
+#endif /* WITH_TINY_DICE */
 
   /* verify Enclave report */
-#if WITH_TRAP
+#if WITH_FHMQV
   enclave_valid = 1;
-#else /* WITH_TRAP */
+#else /* WITH_FHMQV */
   uECC_decompress(report.sm.public_key, sm_public_key, uECC_CURVE());
   memcpy(scratchpad, report.enclave.hash, MDSIZE);
   memcpy(scratchpad + MDSIZE, report.enclave.data, report.enclave.data_len);
@@ -195,7 +209,7 @@ Report::checkSignaturesOnly(const byte* dev_public_key) {
     return 0;
   }
   enclave_valid = uECC_verify(sm_public_key, md, MDSIZE, report.enclave.signature, uECC_CURVE());
-#endif /* WITH_TRAP */
+#endif /* WITH_FHMQV */
 
   return sm_valid && enclave_valid;
 }

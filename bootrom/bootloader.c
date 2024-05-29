@@ -4,14 +4,20 @@
 #include "string.h"
 #include "uECC.h"
 
+#if WITH_TINY_DICE
+extern uint8_t tiny_dice_cdi_l0[TINY_DICE_CDI_SIZE];
+#endif /* WITH_TINY_DICE */
+
 // Sanctum header fields in DRAM
 extern uint8_t sanctum_dev_public_key[ECC_CURVE_P_256_SIZE * 2];
 extern uint8_t sanctum_dev_secret_key[ECC_CURVE_P_256_SIZE];
 unsigned int sanctum_sm_size = 0x1ff000;
 extern uint8_t sanctum_sm_hash[SHA_256_DIGEST_LENGTH];
+#if !WITH_TINY_DICE
 extern uint8_t sanctum_sm_public_key[ECC_CURVE_P_256_SIZE * 2];
 extern uint8_t sanctum_sm_secret_key[ECC_CURVE_P_256_SIZE];
 extern uint8_t sanctum_sm_signature[ECC_CURVE_P_256_SIZE * 2];
+#endif /* !WITH_TINY_DICE */
 #define DRAM_BASE 0x80000000
 
 /* Update this to generate valid entropy for target platform*/
@@ -48,6 +54,14 @@ void bootloader() {
     while (1);
   }
 
+#if WITH_TINY_DICE
+  /* generate CDI_L0 */
+  if (!sha_256_hkdf_expand(sanctum_dev_secret_key, sizeof(sanctum_dev_secret_key),
+                           sanctum_sm_hash, sizeof(sanctum_sm_hash), /* TODO split SM into L0 and L1 */
+                           tiny_dice_cdi_l0, sizeof(tiny_dice_cdi_l0))) {
+    while (1);
+  }
+#else /* WITH_TINY_DICE */
   // Generate SM key pair
   if (!uECC_make_key(sanctum_sm_public_key, sanctum_sm_secret_key, uECC_CURVE())) {
     while (1);
@@ -71,6 +85,7 @@ void bootloader() {
       while (1);
     }
   }
+#endif /* WITH_TINY_DICE */
 
   // Clean up
   // Erase SK_D
