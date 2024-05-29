@@ -24,9 +24,11 @@ platform-cflags-y += -DKEYSTONE_SM=1 \
                      -DuECC_ENABLE_VLI_API=1
 
 ifeq ($(KEYSTONE_ATTESTATION),sigma)
-platform-cflags-y += -DWITH_TRAP=0
+platform-cflags-y += -DWITH_FHMQVC=0 -DWITH_FHMQV=0 -DWITH_TINY_DICE=0
 else ifeq ($(KEYSTONE_ATTESTATION),trap)
-platform-cflags-y += -DWITH_TRAP=1
+platform-cflags-y += -DWITH_FHMQVC=1 -DWITH_FHMQV=1 -DWITH_TINY_DICE=0
+else ifeq ($(KEYSTONE_ATTESTATION),irap)
+platform-cflags-y += -DWITH_FHMQVC=0 -DWITH_FHMQV=1 -DWITH_TINY_DICE=1
 else
-$(error KEYSTONE_ATTESTATION must either be sigma or trap)
+$(error KEYSTONE_ATTESTATION must either be sigma, trap, or irap)
 endif

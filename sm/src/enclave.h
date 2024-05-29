@@ -1,5 +1,6 @@
 //******************************************************************************
 // Copyright (c) 2018, The Regents of the University of California (Regents).
+// Copyright (c) 2025, Siemens AG.
 // All Rights Reserved. See LICENSE for license details.
 //------------------------------------------------------------------------------
 #ifndef _ENCLAVE_H_
@@ -83,20 +84,27 @@ struct enclave_report
   byte hash[MDSIZE];
   uint64_t data_len;
   byte data[ATTEST_DATA_MAXLEN];
-#if WITH_TRAP
+#if WITH_FHMQV
   byte ephemeral_public_key_compressed[PUBLIC_KEY_COMPRESSED_SIZE];
   byte fhmqv_key[MDSIZE];
+#if WITH_FHMQVC
   byte servers_fhmqv_mic[MDSIZE];
   byte clients_fhmqv_mic[MDSIZE];
-#else /* WITH_TRAP */
+#endif /* WITH_FHMQVC */
+#else /* WITH_FHMQV */
   byte signature[SIGNATURE_SIZE];
-#endif /* WITH_TRAP */
+#endif /* WITH_FHMQV */
 };
 struct sm_report
 {
   byte hash[MDSIZE];
+#if WITH_TINY_DICE
+  byte cert_chain[TINY_DICE_MAX_CERT_CHAIN_SIZE];
+  uint32_t cert_chain_size;
+#else /* WITH_TINY_DICE */
   byte public_key[PUBLIC_KEY_COMPRESSED_SIZE];
   byte signature[SIGNATURE_SIZE];
+#endif /* WITH_TINY_DICE */
 };
 struct report
 {

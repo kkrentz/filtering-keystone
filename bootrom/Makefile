@@ -4,6 +4,12 @@
 # CFLAGS since these assume that the build target isn't firmware-like
 # (i.e. we want nostdlib, nostartfiles, etc).
 
+ifeq (${KEYSTONE_ATTESTATION},irap)
+	WITH_TINY_DICE = 1
+else
+	WITH_TINY_DICE = 0
+endif
+
 override CFLAGS := \
 	-DKEYSTONE_BOOTLOADER=1 \
 	-DuECC_ENABLE_VLI_API=1 \
@@ -13,6 +19,7 @@ override CFLAGS := \
 	-DuECC_SUPPORTS_secp224r1=0 \
 	-DuECC_SUPPORTS_secp256r1=1 \
 	-DuECC_SUPPORTS_secp256k1=0 \
+	-DWITH_TINY_DICE=${WITH_TINY_DICE} \
 	-mcmodel=medany \
 	-nostdlib -nostartfiles -fno-common -std=gnu11 \
 	-static \
@@ -44,6 +51,7 @@ bootrom_sources = \
 	$(CC) \
 		$(CFLAGS) \
 		-I./ \
+		-I${KEYSTONE_SDK}/include/shared/ \
 		-I${KEYSTONE_SM}/src/libcoap/ext/micro-ecc \
 		-I${KEYSTONE_SM}/src/ \
 		-L . \

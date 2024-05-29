@@ -1,5 +1,6 @@
 //******************************************************************************
 // Copyright (c) 2018, The Regents of the University of California (Regents).
+// Copyright (c) 2025, Siemens AG.
 // All Rights Reserved. See LICENSE for license details.
 //------------------------------------------------------------------------------
 #include "ipi.h"
@@ -22,11 +23,32 @@ static int sm_region_id = 0, os_region_id = 0;
 #error "SM requires a defined platform to build"
 #endif
 
+#if WITH_TINY_DICE
+static struct {
+  uint32_t counter;
+  uint8_t salt[MDSIZE];
+} deterministic_rng_info;
+
+struct cert_l1 {
+  tiny_dice_cert_t cert;
+  byte bytes[TINY_DICE_MAX_CERT_SIZE];
+  size_t size;
+  byte hash[MDSIZE];
+};
+#endif
+
 // Special target platform header, set by configure script
 #include TARGET_PLATFORM_HEADER
 
 byte sm_hash[MDSIZE] = { 0, };
+#if WITH_TINY_DICE
+byte sm_cdi_l0[TINY_DICE_CDI_SIZE];
+byte sm_cert_chain[TINY_DICE_MAX_CERT_CHAIN_SIZE];
+uint32_t sm_cert_chain_size;
+byte dev_secret_key[PRIVATE_KEY_SIZE] = { 0, };
+#else /* WITH_TINY_DICE */
 byte sm_signature[SIGNATURE_SIZE] = { 0, };
+#endif /* WITH_TINY_DICE */
 byte sm_public_key[PUBLIC_KEY_SIZE] = { 0, };
 byte sm_private_key[PRIVATE_KEY_SIZE] = { 0, };
 byte dev_public_key[PUBLIC_KEY_SIZE] = { 0, };
@@ -65,7 +87,7 @@ static int rng(uint8_t *dest, unsigned size)
   return 1;
 }
 
-#if WITH_TRAP
+#if WITH_FHMQV
 int sm_fhmqv(struct enclave_report *enclave_report)
 {
   const uint8_t *peers_static_public_key;
@@ -77,7 +99,9 @@ int sm_fhmqv(struct enclave_report *enclave_report)
   uint8_t sigma[MDSIZE];
   uint8_t ikm[4 * PUBLIC_KEY_SIZE];
   uint8_t okm[2 * MDSIZE];
+#if WITH_FHMQVC
   sha_256_hmac_context_t hmac_ctx;
+#endif /* WITH_FHMQVC */
 
   if (enclave_report->data_len
       != (PUBLIC_KEY_SIZE + PUBLIC_KEY_COMPRESSED_SIZE)) {
@@ -129,13 +153,19 @@ int sm_fhmqv(struct enclave_report *enclave_report)
              + sizeof(peers_ephemeral_public_key),
              our_ephemeral_public_key,
              sizeof(our_ephemeral_public_key));
-  kdf(NULL, 0, /* TODO use salt */
+  kdf(
+#if WITH_FHMQVC
+      NULL, 0,
+#else /* WITH_FHMQVC */
+      enclave_report->hash, sizeof(enclave_report->hash),
+#endif /* WITH_FHMQVC */
       sigma, sizeof(sigma),
       ikm, sizeof(ikm),
       okm, sizeof(okm));
   sbi_memcpy(enclave_report->fhmqv_key,
              okm + sizeof(okm) / 2,
              sizeof(okm) / 2);
+#if WITH_FHMQVC
   sha_256_hmac_init(&hmac_ctx, okm, sizeof(okm) / 2);
   sha_256_hmac_update(&hmac_ctx,
                       sm_public_key,
@@ -157,9 +187,10 @@ int sm_fhmqv(struct enclave_report *enclave_report)
   if (!sha_256_hmac_finish(&hmac_ctx, enclave_report->clients_fhmqv_mic)) {
     return 1;
   }
+#endif /* WITH_FHMQVC */
   return 0;
 }
-#endif /* WITH_TRAP */
+#endif /* WITH_FHMQV */
 
 int sm_sign(void* signature, byte digest[MDSIZE])
 {
@@ -222,6 +253,134 @@ void sm_print_cert()
 }
 */
 
+#if WITH_TINY_DICE
+static int
+deterministic_rng(uint8_t *dest, unsigned size)
+{
+  kdf(NULL, 0,
+      sm_cdi_l0, sizeof(sm_cdi_l0),
+      (const uint8_t *)&deterministic_rng_info, sizeof(deterministic_rng_info),
+      dest, size);
+  deterministic_rng_info.counter++;
+  return 1;
+}
+
+static int
+encode_and_hash(
+    const uint8_t reconstruction_data[2 * ECC_CURVE_P_256_SIZE],
+    void *ptr,
+    uint8_t certificate_hash[ECC_CURVE_P_256_SIZE])
+{
+  struct cert_l1 *cert_l1 = (struct cert_l1 *)ptr;
+
+  /* set reconstruction data of Cert_L1 */
+  uECC_compress(reconstruction_data,
+                cert_l1->cert.reconstruction_data,
+                uECC_CURVE());
+
+  /* dump Cert_L1 */
+  sbi_printf("Cert_L1 (at rest) {\n");
+  sbi_printf("  subject: '',\n");
+  sbi_printf("  issuer: %i (SHA-256),\n", cert_l1->cert.issuer_hash);
+  sbi_printf("  curve: %i (secp256r1),\n", cert_l1->cert.curve);
+  sbi_printf("  reconstruction-data: ");
+  for (size_t i = 0; i < sizeof(cert_l1->cert.reconstruction_data); i++) {
+    sbi_printf("%02x", cert_l1->cert.reconstruction_data[i]);
+  }
+  sbi_printf(",\n");
+  sbi_printf("  tci: ");
+  for (size_t i = 0; i < TINY_DICE_TCI_SIZE; i++) {
+    sbi_printf("%02x", cert_l1->cert.tci_digest[i]);
+  }
+  sbi_printf("\n");
+  sbi_printf("}\n");
+  sbi_printf("Cert_L1 (in transit) {\n");
+  sbi_printf("  reconstruction-data: ");
+  for (size_t i = 0; i < sizeof(cert_l1->cert.reconstruction_data); i++) {
+    sbi_printf("%02x", cert_l1->cert.reconstruction_data[i]);
+  }
+  sbi_printf(",\n");
+  sbi_printf("  tci: 1\n");
+  sbi_printf("}\n");
+
+  /* write Cert_L1 */
+  cbor_writer_state_t writer;
+  cbor_init_writer(&writer, cert_l1->bytes, sizeof(cert_l1->bytes));
+  tiny_dice_write_cert(&writer, &cert_l1->cert);
+  cert_l1->size = cbor_end_writer(&writer);
+  if (!cert_l1->size) {
+    return 0;
+  }
+
+  /* hash Cert_L1 */
+  hash_ctx ctx;
+  hash_init(&ctx);
+  hash_extend(&ctx, cert_l1->bytes, cert_l1->size);
+  hash_finalize(cert_l1->hash, &ctx);
+  sbi_memcpy(certificate_hash, cert_l1->hash, sizeof(cert_l1->hash));
+  return 1;
+}
+
+void init_tiny_dice(void)
+{
+  /* generate DeviceID */
+  if(!uECC_make_key_deterministic(deterministic_rng,
+                                  dev_public_key,
+                                  dev_secret_key,
+                                  uECC_CURVE())) {
+    sbi_printf("failed to generate DeviceID\n");
+    sbi_hart_hang();
+  }
+
+  /* generate proto-AKey_L0 */
+  sbi_memcpy(deterministic_rng_info.salt, sm_hash, sizeof(sm_hash));
+  uint8_t proto_akey_l0_public_key[ECC_CURVE_P_256_SIZE * 2];
+  uint8_t proto_akey_l0_secret_key[ECC_CURVE_P_256_SIZE];
+  if (!uECC_make_key_deterministic(deterministic_rng,
+                                   proto_akey_l0_public_key,
+                                   proto_akey_l0_secret_key,
+                                   uECC_CURVE())) {
+    sbi_printf("failed to generate proto-AKey_L0\n");
+    sbi_hart_hang();
+  }
+
+  /* issue Cert_L1 certificate */
+  uint8_t private_key_reconstruction_data[ECC_CURVE_P_256_SIZE];
+  struct cert_l1 cert_l1;
+  tiny_dice_clear_cert(&cert_l1.cert);
+  cert_l1.cert.tci_digest = sm_hash;
+  do {
+    if (!uECC_issue_ecqv_certificate(proto_akey_l0_public_key,
+                                     dev_secret_key,
+                                     encode_and_hash,
+                                     &cert_l1,
+                                     private_key_reconstruction_data,
+                                     uECC_CURVE())) {
+      sbi_printf("failed to issue TinyDICE certificate\n");
+      sbi_hart_hang();
+    }
+    /* generate AKey_L0 (= sm_public_key/sm_private_key) */
+  } while (!uECC_generate_ecqv_key_pair(proto_akey_l0_secret_key,
+                                        cert_l1.hash,
+                                        MDSIZE,
+                                        private_key_reconstruction_data,
+                                        sm_public_key,
+                                        sm_private_key,
+                                        uECC_CURVE()));
+
+  cbor_writer_state_t writer;
+  cbor_init_writer(&writer, sm_cert_chain, sizeof(sm_cert_chain));
+  cbor_open_array(&writer);
+  cbor_write_object(&writer, cert_l1.bytes, cert_l1.size);
+  cbor_close_array(&writer);
+  sm_cert_chain_size = cbor_end_writer(&writer);
+  if (!sm_cert_chain_size) {
+    sbi_printf("failed to write certificate chain\n");
+    sbi_hart_hang();
+  }
+}
+#endif /* WITH_TINY_DICE */
+
 void sm_init(bool cold_boot)
 {
 	// initialize SMM
@@ -276,6 +435,9 @@ void sm_init(bool cold_boot)
 
   if (cold_boot) {
     uECC_set_rng(rng);
+#if WITH_TINY_DICE
+    init_tiny_dice();
+#endif /* WITH_TINY_DICE */
     sbi_printf("[SM] cold boot initialization done\n");
   }
 
