@@ -1,5 +1,6 @@
 //******************************************************************************
 // Copyright (c) 2018, The Regents of the University of California (Regents).
+// Copyright (c) 2025, Siemens AG.
 // All Rights Reserved. See LICENSE for license details.
 //------------------------------------------------------------------------------
 #include "enclave.h"
@@ -633,17 +634,22 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
 
   sbi_memcpy(report.dev_public_key, dev_public_key, PUBLIC_KEY_SIZE);
   sbi_memcpy(report.sm.hash, sm_hash, MDSIZE);
+#if WITH_TINY_DICE
+  sbi_memcpy(report.sm.cert_chain, sm_cert_chain, sizeof(sm_cert_chain));
+  report.sm.cert_chain_size = sm_cert_chain_size;
+#else /* WITH_TINY_DICE */
   uECC_compress(sm_public_key, report.sm.public_key, uECC_CURVE());
   sbi_memcpy(report.sm.signature, sm_signature, SIGNATURE_SIZE);
+#endif /* WITH_TINY_DICE */
   sbi_memcpy(report.enclave.hash, enclaves[eid].hash, MDSIZE);
 
-#if WITH_TRAP
+#if WITH_FHMQV
   if (!report.enclave.data_len) {
     /* this is for printing hashes at start up */
   } else if (sm_fhmqv(&report.enclave)) {
     return SBI_ERR_SM_ENCLAVE_UNKNOWN_ERROR;
   }
-#else /* WITH_TRAP */
+#else /* WITH_FHMQV */
   {
     byte digest[MDSIZE];
     hash_ctx ctx;
@@ -655,7 +661,7 @@ unsigned long attest_enclave(uintptr_t report_ptr, uintptr_t data, uintptr_t siz
       return SBI_ERR_SM_ENCLAVE_UNKNOWN_ERROR;
     }
   }
-#endif /* WITH_TRAP */
+#endif /* WITH_FHMQV */
 
   spin_lock(&encl_lock);
 

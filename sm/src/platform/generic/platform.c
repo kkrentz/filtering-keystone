@@ -48,22 +48,34 @@ uint64_t platform_random(){
 
 /* from Sanctum BootROM */
 extern byte sanctum_sm_hash[MDSIZE];
+#if WITH_TINY_DICE
+extern byte tiny_dice_cdi_l0[TINY_DICE_CDI_SIZE];
+#else /* WITH_TINY_DICE */
 extern byte sanctum_sm_signature[SIGNATURE_SIZE];
 extern byte sanctum_sm_secret_key[PRIVATE_KEY_SIZE];
 extern byte sanctum_sm_public_key[PUBLIC_KEY_SIZE];
 extern byte sanctum_dev_public_key[PUBLIC_KEY_SIZE];
+#endif /* WITH_TINY_DICE */
 
 extern byte sm_hash[MDSIZE];
+#if WITH_TINY_DICE
+extern byte sm_cdi_l0[TINY_DICE_CDI_SIZE];
+#else /* WITH_TINY_DICE */
 extern byte sm_signature[SIGNATURE_SIZE];
 extern byte sm_public_key[PUBLIC_KEY_SIZE];
 extern byte sm_private_key[PRIVATE_KEY_SIZE];
 extern byte dev_public_key[PUBLIC_KEY_SIZE];
+#endif /* WITH_TINY_DICE */
 
 void sm_copy_key(void)
 {
   sbi_memcpy(sm_hash, sanctum_sm_hash, MDSIZE);
+#if WITH_TINY_DICE
+  sbi_memcpy(sm_cdi_l0, tiny_dice_cdi_l0, sizeof(sm_cdi_l0));
+#else /* WITH_TINY_DICE */
   sbi_memcpy(sm_signature, sanctum_sm_signature, SIGNATURE_SIZE);
   sbi_memcpy(sm_public_key, sanctum_sm_public_key, PUBLIC_KEY_SIZE);
   sbi_memcpy(sm_private_key, sanctum_sm_secret_key, PRIVATE_KEY_SIZE);
   sbi_memcpy(dev_public_key, sanctum_dev_public_key, PUBLIC_KEY_SIZE);
+#endif /* WITH_TINY_DICE */
 }

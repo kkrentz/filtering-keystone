@@ -1,5 +1,6 @@
 //******************************************************************************
 // Copyright (c) 2018, The Regents of the University of California (Regents).
+// Copyright (c) 2025, Siemens AG.
 // All Rights Reserved. See LICENSE for license details.
 //------------------------------------------------------------------------------
 #ifndef sm_h
@@ -19,10 +20,10 @@ void sm_init(bool cold_boot);
 /* platform specific functions */
 #define ATTESTATION_KEY_LENGTH  64
 void sm_retrieve_pubkey(void* dest);
-#if WITH_TRAP
+#if WITH_FHMQV
 struct enclave_report;
 int sm_fhmqv(struct enclave_report *enclave_report);
-#endif /* WITH_TRAP */
+#endif /* WITH_FHMQV */
 int sm_sign(void* signature, byte digest[MDSIZE]);
 int sm_derive_sealing_key(unsigned char *key,
                           const unsigned char *key_ident,

@@ -2,7 +2,7 @@ diff --git firmware/fw_base.ldS firmware/fw_base.ldS
 index 0ac75f2..9aa9c1a 100644
 --- a/firmware/fw_base.ldS
 +++ b/firmware/fw_base.ldS
-@@ -79,3 +79,39 @@
+@@ -79,3 +79,43 @@
  	. = ALIGN(0x1000); /* Need this to create proper sections */
  
  	PROVIDE(_fw_end = .);
@@ -42,3 +42,7 @@ index 0ac75f2..9aa9c1a 100644
 +  /* 64 Bytes : security monitor's signature by device */
 +  PROVIDE( sanctum_sm_signature = . );
 +  . += 0x40;
++
++  /* 32 Bytes : CDI_L0 */
++  PROVIDE( tiny_dice_cdi_l0 = . );
++  . += 0x20;

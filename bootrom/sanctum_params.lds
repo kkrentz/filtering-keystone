@@ -31,3 +31,7 @@ PROVIDE( sanctum_sm_secret_key = . );
 /* 64 Bytes : security monitor's signature by device */
 PROVIDE( sanctum_sm_signature = . );
 . += 0x40;
+
+/* 32 Bytes : CDI_L0 */
+PROVIDE( tiny_dice_cdi_l0 = . );
+. += 0x20;

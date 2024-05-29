@@ -1,5 +1,6 @@
 //******************************************************************************
 // Copyright (c) 2018, The Regents of the University of California (Regents).
+// Copyright (c) 2025, Siemens AG.
 // All Rights Reserved. See LICENSE for license details.
 //------------------------------------------------------------------------------
 #ifndef __CRYPTO_H__
@@ -20,7 +21,12 @@ typedef sha_256_context_t hash_ctx;
 typedef unsigned char byte;
 
 extern byte sm_hash[MDSIZE];
+#if WITH_TINY_DICE
+extern byte sm_cert_chain[TINY_DICE_MAX_CERT_CHAIN_SIZE];
+extern uint32_t sm_cert_chain_size;
+#else /* WITH_TINY_DICE */
 extern byte sm_signature[SIGNATURE_SIZE];
+#endif /* WITH_TINY_DICE */
 extern byte sm_public_key[PUBLIC_KEY_SIZE];
 extern byte sm_private_key[PRIVATE_KEY_SIZE];
 

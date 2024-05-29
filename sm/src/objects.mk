@@ -11,7 +11,9 @@ ifneq ($(KEYSTONE_SM_NO_CRYPTO),y)
 keystone-sm-headers += coap3/coap_internal.h \
                        crypto.h \
                        libcoap/ext/micro-ecc/uECC.h \
-                       libcoap/src/oscore-ng/oscore_ng_sha_256.h
+                       libcoap/src/oscore-ng/oscore_ng_cbor.h \
+                       libcoap/src/oscore-ng/oscore_ng_sha_256.h \
+                       libcoap/src/oscore-ng/oscore_ng_tiny_dice.h
 endif
 
 # Platform headers
@@ -41,7 +43,9 @@ keystone-sm-sources += attest.c cpu.c enclave.c pmp.c sm.c sm-sbi.c sm-sbi-opens
 ifneq ($(KEYSTONE_SM_NO_CRYPTO),y)
 keystone-sm-sources += crypto.c \
                        libcoap/ext/micro-ecc/uECC.c \
-                       libcoap/src/oscore-ng/oscore_ng_sha_256.c
+                       libcoap/src/oscore-ng/oscore_ng_cbor.c \
+                       libcoap/src/oscore-ng/oscore_ng_sha_256.c \
+                       libcoap/src/oscore-ng/oscore_ng_tiny_dice.c
 endif
 
 # Platform
