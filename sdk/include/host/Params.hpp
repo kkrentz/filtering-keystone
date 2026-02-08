@@ -4,6 +4,7 @@
 //------------------------------------------------------------------------------
 #pragma once
 
+#include <cstdint>
 #include <cstdio>
 
 #if __riscv_xlen == 64
