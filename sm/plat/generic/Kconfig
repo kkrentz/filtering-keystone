@@ -1,0 +1,1 @@
+source "$(OPENSBI_SRC_DIR)/platform/generic/Kconfig"
