@@ -1,5 +1,5 @@
 diff --git a/include/sbi/sbi_tlb.h b/include/sbi/sbi_tlb.h
-index 2c50fe85..55dcab08 100644
+index 3936e857..1aba23b2 100644
 --- a/include/sbi/sbi_tlb.h
 +++ b/include/sbi/sbi_tlb.h
 @@ -22,33 +22,30 @@
@@ -50,40 +50,38 @@ index 2c50fe85..55dcab08 100644
  } while (0)
  
 diff --git a/lib/sbi/sbi_ecall_legacy.c b/lib/sbi/sbi_ecall_legacy.c
-index 14913c96..8280c28b 100644
+index 50a7660d..4bb350fb 100644
 --- a/lib/sbi/sbi_ecall_legacy.c
 +++ b/lib/sbi/sbi_ecall_legacy.c
-@@ -83,7 +83,8 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
+@@ -81,7 +81,7 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
  		if (sbi_load_hart_mask_unpriv((ulong *)regs->a0,
- 						&hmask, &trap)) {
+ 					      &hmask, &hbase, &trap)) {
  			SBI_TLB_INFO_INIT(&tlb_info, 0, 0, 0, 0,
 -					  SBI_TLB_FENCE_I, source_hart);
-+					  sbi_tlb_local_fence_i,
-+					  source_hart);
- 			ret = sbi_tlb_request(hmask, 0, &tlb_info);
++					  sbi_tlb_local_fence_i, source_hart);
+ 			ret = sbi_tlb_request(hmask, hbase, &tlb_info);
  		} else {
- 			trap.epc = regs->mepc;
-@@ -95,7 +96,8 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
+ 			sbi_trap_redirect(regs, &trap);
+@@ -92,7 +92,7 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
  		if (sbi_load_hart_mask_unpriv((ulong *)regs->a0,
- 						&hmask, &trap)) {
+ 					      &hmask, &hbase, &trap)) {
  			SBI_TLB_INFO_INIT(&tlb_info, regs->a1, regs->a2, 0, 0,
 -					  SBI_TLB_SFENCE_VMA, source_hart);
-+					  sbi_tlb_local_sfence_vma,
-+					  source_hart);
- 			ret = sbi_tlb_request(hmask, 0, &tlb_info);
++					  sbi_tlb_local_sfence_vma, source_hart);
+ 			ret = sbi_tlb_request(hmask, hbase, &tlb_info);
  		} else {
- 			trap.epc = regs->mepc;
-@@ -108,7 +110,7 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
- 						&hmask, &trap)) {
+ 			sbi_trap_redirect(regs, &trap);
+@@ -104,7 +104,7 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
+ 					      &hmask, &hbase, &trap)) {
  			SBI_TLB_INFO_INIT(&tlb_info, regs->a1,
  					  regs->a2, regs->a3, 0,
 -					  SBI_TLB_SFENCE_VMA_ASID,
 +					  sbi_tlb_local_sfence_vma_asid,
  					  source_hart);
- 			ret = sbi_tlb_request(hmask, 0, &tlb_info);
+ 			ret = sbi_tlb_request(hmask, hbase, &tlb_info);
  		} else {
 diff --git a/lib/sbi/sbi_ecall_rfence.c b/lib/sbi/sbi_ecall_rfence.c
-index ded16c26..038da282 100644
+index 903adfbf..f00c10fe 100644
 --- a/lib/sbi/sbi_ecall_rfence.c
 +++ b/lib/sbi/sbi_ecall_rfence.c
 @@ -32,41 +32,43 @@ static int sbi_ecall_rfence_handler(unsigned long extid, unsigned long funcid,
@@ -138,10 +136,10 @@ index ded16c26..038da282 100644
  		break;
  	default:
 diff --git a/lib/sbi/sbi_tlb.c b/lib/sbi/sbi_tlb.c
-index cca319f9..d3ed56df 100644
+index ada60c32..29cfd87b 100644
 --- a/lib/sbi/sbi_tlb.c
 +++ b/lib/sbi/sbi_tlb.c
-@@ -34,7 +34,7 @@ static void tlb_flush_all(void)
+@@ -34,7 +34,7 @@ void __sbi_sfence_vma_all(void)
  	__asm__ __volatile("sfence.vma");
  }
  
@@ -290,7 +288,7 @@ index cca319f9..d3ed56df 100644
  		return SBI_IPI_UPDATE_BREAK;
  	}
  
-@@ -381,19 +370,9 @@ static struct sbi_ipi_event_ops tlb_ops = {
+@@ -382,19 +371,9 @@ static struct sbi_ipi_event_ops tlb_ops = {
  
  static u32 tlb_event = SBI_IPI_EVENT_MAX;
  
@@ -311,7 +309,7 @@ index cca319f9..d3ed56df 100644
  		return SBI_EINVAL;
  
  	/*
-@@ -406,7 +385,7 @@ int sbi_tlb_request(ulong hmask, ulong hbase, struct sbi_tlb_info *tinfo)
+@@ -407,7 +386,7 @@ int sbi_tlb_request(ulong hmask, ulong hbase, struct sbi_tlb_info *tinfo)
  		tinfo->size = SBI_TLB_FLUSH_ALL;
  	}
  

@@ -5,9 +5,18 @@
 
 #include "sm.h"
 
-static int generic_final_init(bool cold_boot, const struct fdt_match *match) {
-        sm_init(cold_boot);
-        return 0;
+static int final_init(bool cold_boot)
+{
+  sm_init(cold_boot);
+
+  return generic_final_init(cold_boot);
+}
+
+static int init(const void *fdt, int nodeoff, const struct fdt_match *match)
+{
+  generic_platform_ops.final_init = final_init;
+
+  return 0;
 }
 
 static const struct fdt_match generic_match[] = {
@@ -16,7 +25,7 @@ static const struct fdt_match generic_match[] = {
 	{ },
 };
 
-const struct platform_override generic = {
+const struct fdt_driver generic = {
 	.match_table = generic_match,
-        .final_init = generic_final_init
+	.init = init,
 };

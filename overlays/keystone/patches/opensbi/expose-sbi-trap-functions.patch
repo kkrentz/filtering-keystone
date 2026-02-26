@@ -1,0 +1,31 @@
+diff --git a/lib/sbi/sbi_trap.c b/lib/sbi/sbi_trap.c
+index 3028fc7b..bf351c5c 100644
+--- a/lib/sbi/sbi_trap.c
++++ b/lib/sbi/sbi_trap.c
+@@ -74,7 +74,7 @@ static void sbi_trap_error_one(const struct sbi_trap_context *tcntx,
+ 		   hartid, depth, "t6", regs->t6);
+ }
+ 
+-static void __noreturn sbi_trap_error(const char *msg, int rc,
++void __noreturn sbi_trap_error(const char *msg, int rc,
+ 				      const struct sbi_trap_context *tcntx)
+ {
+ 	u32 depth = 0, hartid = current_hartid();
+@@ -231,7 +231,7 @@ int sbi_trap_redirect(struct sbi_trap_regs *regs,
+ 	return 0;
+ }
+ 
+-static int sbi_trap_nonaia_irq(unsigned long irq)
++int sbi_trap_nonaia_irq(unsigned long irq)
+ {
+ 	switch (irq) {
+ 	case IRQ_M_TIMER:
+@@ -253,7 +253,7 @@ static int sbi_trap_nonaia_irq(unsigned long irq)
+ 	return 0;
+ }
+ 
+-static int sbi_trap_aia_irq(void)
++int sbi_trap_aia_irq(void)
+ {
+ 	int rc;
+ 	unsigned long mtopi;
