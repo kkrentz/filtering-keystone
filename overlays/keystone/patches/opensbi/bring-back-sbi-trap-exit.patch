@@ -1,0 +1,139 @@
+diff --git a/firmware/fw_base.S b/firmware/fw_base.S
+index bce9e226..2934ebd7 100644
+--- a/firmware/fw_base.S
++++ b/firmware/fw_base.S
+@@ -234,6 +234,9 @@ _scratch_init:
+ 	/* Store hartid-to-scratch function address in scratch space */
+ 	lla	a4, _hartid_to_scratch
+ 	REG_S	a4, SBI_SCRATCH_HARTID_TO_SCRATCH_OFFSET(tp)
++	/* Store trap-exit function address in scratch space */
++	lla	a4, _trap_exit
++	REG_S	a4, SBI_SCRATCH_TRAP_EXIT_OFFSET(tp)
+ 	/* Clear trap_context and tmp0 in scratch space */
+ 	REG_S	zero, SBI_SCRATCH_TRAP_CONTEXT_OFFSET(tp)
+ 	REG_S	zero, SBI_SCRATCH_TMP0_OFFSET(tp)
+@@ -372,6 +375,10 @@ _start_warm:
+ 	srli	a5, a5, ('H' - 'A')
+ 	andi	a5, a5, 0x1
+ 	beq	a5, zero, _skip_trap_handler_hyp
++	/* Override trap exit for H-extension */
++	csrr	a5, CSR_MSCRATCH
++	lla	a4, _trap_exit_rv32_hyp
++	REG_S	a4, SBI_SCRATCH_TRAP_EXIT_OFFSET(a5)
+ 	lla	a4, _trap_handler_hyp
+ _skip_trap_handler_hyp:
+ 	csrw	CSR_MTVEC, a4
+@@ -646,6 +653,7 @@ memcmp:
+ 	.section .entry, "ax", %progbits
+ 	.align 3
+ 	.globl _trap_handler
++	.globl _trap_exit
+ _trap_handler:
+ 	TRAP_SAVE_AND_SETUP_SP_T0
+ 
+@@ -657,6 +665,7 @@ _trap_handler:
+ 
+ 	TRAP_CALL_C_ROUTINE
+ 
++_trap_exit:
+ 	TRAP_RESTORE_GENERAL_REGS_EXCEPT_A0_T0
+ 
+ 	TRAP_RESTORE_MEPC_MSTATUS 0
+@@ -668,6 +677,7 @@ _trap_handler:
+ 	.section .entry, "ax", %progbits
+ 	.align 3
+ 	.globl _trap_handler_hyp
++	.globl _trap_exit_rv32_hyp
+ _trap_handler_hyp:
+ 	TRAP_SAVE_AND_SETUP_SP_T0
+ 
+@@ -687,6 +697,7 @@ _trap_handler_hyp:
+ 
+ 	TRAP_CALL_C_ROUTINE
+ 
++_trap_exit_rv32_hyp:
+ 	TRAP_RESTORE_GENERAL_REGS_EXCEPT_A0_T0
+ 
+ #if __riscv_xlen == 32
+diff --git a/include/sbi/sbi_scratch.h b/include/sbi/sbi_scratch.h
+index 58d54628..d3e53552 100644
+--- a/include/sbi/sbi_scratch.h
++++ b/include/sbi/sbi_scratch.h
+@@ -38,14 +38,16 @@
+ #define SBI_SCRATCH_HARTID_TO_SCRATCH_OFFSET	(10 * __SIZEOF_POINTER__)
+ /** Offset of trap_context member in sbi_scratch */
+ #define SBI_SCRATCH_TRAP_CONTEXT_OFFSET		(11 * __SIZEOF_POINTER__)
++/** Offset of trap_exit member in sbi_scratch */
++#define SBI_SCRATCH_TRAP_EXIT_OFFSET		(12 * __SIZEOF_POINTER__)
+ /** Offset of tmp0 member in sbi_scratch */
+-#define SBI_SCRATCH_TMP0_OFFSET			(12 * __SIZEOF_POINTER__)
++#define SBI_SCRATCH_TMP0_OFFSET			(13 * __SIZEOF_POINTER__)
+ /** Offset of options member in sbi_scratch */
+-#define SBI_SCRATCH_OPTIONS_OFFSET		(13 * __SIZEOF_POINTER__)
++#define SBI_SCRATCH_OPTIONS_OFFSET		(14 * __SIZEOF_POINTER__)
+ /** Offset of hartindex member in sbi_scratch */
+-#define SBI_SCRATCH_HARTINDEX_OFFSET		(14 * __SIZEOF_POINTER__)
++#define SBI_SCRATCH_HARTINDEX_OFFSET		(15 * __SIZEOF_POINTER__)
+ /** Offset of extra space in sbi_scratch */
+-#define SBI_SCRATCH_EXTRA_SPACE_OFFSET		(15 * __SIZEOF_POINTER__)
++#define SBI_SCRATCH_EXTRA_SPACE_OFFSET		(16 * __SIZEOF_POINTER__)
+ /** Maximum size of sbi_scratch (4KB) */
+ #define SBI_SCRATCH_SIZE			(0x1000)
+ 
+@@ -81,6 +83,8 @@ struct sbi_scratch {
+ 	unsigned long hartid_to_scratch;
+ 	/** Address of current trap context */
+ 	unsigned long trap_context;
++	/** Address of trap exit function */
++	unsigned long trap_exit;
+ 	/** Temporary storage */
+ 	unsigned long tmp0;
+ 	/** Options for OpenSBI library */
+@@ -105,6 +109,7 @@ assert_member_offset(struct sbi_scratch, warmboot_addr, SBI_SCRATCH_WARMBOOT_ADD
+ assert_member_offset(struct sbi_scratch, platform_addr, SBI_SCRATCH_PLATFORM_ADDR_OFFSET);
+ assert_member_offset(struct sbi_scratch, hartid_to_scratch, SBI_SCRATCH_HARTID_TO_SCRATCH_OFFSET);
+ assert_member_offset(struct sbi_scratch, trap_context, SBI_SCRATCH_TRAP_CONTEXT_OFFSET);
++assert_member_offset(struct sbi_scratch, trap_exit, SBI_SCRATCH_TRAP_EXIT_OFFSET);
+ assert_member_offset(struct sbi_scratch, tmp0, SBI_SCRATCH_TMP0_OFFSET);
+ assert_member_offset(struct sbi_scratch, options, SBI_SCRATCH_OPTIONS_OFFSET);
+ assert_member_offset(struct sbi_scratch, hartindex, SBI_SCRATCH_HARTINDEX_OFFSET);
+diff --git a/include/sbi/sbi_trap.h b/include/sbi/sbi_trap.h
+index 731a0c98..6d3ca833 100644
+--- a/include/sbi/sbi_trap.h
++++ b/include/sbi/sbi_trap.h
+@@ -289,6 +289,8 @@ static inline void sbi_trap_set_context(struct sbi_scratch *scratch,
+ 
+ struct sbi_trap_context *sbi_trap_handler(struct sbi_trap_context *tcntx);
+ 
++void __noreturn sbi_trap_exit(const struct sbi_trap_regs *regs);
++
+ #endif
+ 
+ #endif
+diff --git a/lib/sbi/sbi_trap.c b/lib/sbi/sbi_trap.c
+index f41db4d1..3028fc7b 100644
+--- a/lib/sbi/sbi_trap.c
++++ b/lib/sbi/sbi_trap.c
+@@ -375,3 +375,22 @@ trap_done:
+ 	sbi_trap_set_context(scratch, tcntx->prev_context);
+ 	return tcntx;
+ }
++
++typedef void (*trap_exit_t)(const struct sbi_trap_regs *regs);
++
++/**
++ * Exit trap/interrupt handling
++ *
++ * This function is called by non-firmware code to abruptly exit
++ * trap/interrupt handling and resume execution at context pointed
++ * by given register state.
++ *
++ * @param regs pointer to register state
++ */
++void __noreturn sbi_trap_exit(const struct sbi_trap_regs *regs)
++{
++	struct sbi_scratch *scratch = sbi_scratch_thishart_ptr();
++
++	((trap_exit_t)scratch->trap_exit)(regs);
++	__builtin_unreachable();
++}

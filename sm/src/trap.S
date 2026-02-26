@@ -1,9 +1,18 @@
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2019 Western Digital Corporation or its affiliates.
+ *
+ * Authors:
+ *   Anup Patel <anup.patel@wdc.com>
+ */
+
 #include <sbi/sbi_trap.h>
 #include <sbi/riscv_encoding.h>
 #include <sbi/riscv_asm.h>
 #include <sbi/sbi_scratch.h>
-  .option norvc
-  .section .text.init,"ax",@progbits
+  .section .entry, "ax", %progbits
+  .align 3
   .globl trap_vector_enclave
 
 trap_vector_enclave:
@@ -33,10 +42,10 @@ trap_vector_enclave:
     xor    t0, tp, t0
 
     /* Save original SP on exception stack */
-    REG_S    sp, (SBI_TRAP_REGS_OFFSET(sp) - SBI_TRAP_REGS_SIZE)(t0)
+    REG_S    sp, (SBI_TRAP_REGS_OFFSET(sp) - SBI_TRAP_CONTEXT_SIZE)(t0)
 
     /* Set SP to exception stack and make room for trap registers */
-    add    sp, t0, -(SBI_TRAP_REGS_SIZE)
+    add    sp, t0, -(SBI_TRAP_CONTEXT_SIZE)
 
     /* Restore T0 from scratch space */
     REG_L    t0, SBI_SCRATCH_TMP0_OFFSET(tp)
@@ -53,15 +62,6 @@ trap_vector_enclave:
     csrr    t0, CSR_MSTATUS
     REG_S    t0, SBI_TRAP_REGS_OFFSET(mstatus)(sp)
     REG_S    zero, SBI_TRAP_REGS_OFFSET(mstatusH)(sp)
-#if __riscv_xlen == 32
-    csrr    t0, CSR_MISA
-    srli    t0, t0, ('H' - 'A')
-    andi    t0, t0, 0x1
-    beq    t0, zero, _skip_mstatush_save
-    csrr    t0, CSR_MSTATUSH
-    REG_S    t0, SBI_TRAP_REGS_OFFSET(mstatusH)(sp)
-_skip_mstatush_save:
-#endif
 
     /* Save all general regisers except SP and T0 */
     REG_S    zero, SBI_TRAP_REGS_OFFSET(zero)(sp)
@@ -99,56 +99,47 @@ _skip_mstatush_save:
     add    a0, sp, zero
     call    sbi_trap_handler_keystone_enclave
 
-    /* Restore all general regisers except SP and T0 */
-    REG_L    ra, SBI_TRAP_REGS_OFFSET(ra)(sp)
-    REG_L    gp, SBI_TRAP_REGS_OFFSET(gp)(sp)
-    REG_L    tp, SBI_TRAP_REGS_OFFSET(tp)(sp)
-    REG_L    t1, SBI_TRAP_REGS_OFFSET(t1)(sp)
-    REG_L    t2, SBI_TRAP_REGS_OFFSET(t2)(sp)
-    REG_L    s0, SBI_TRAP_REGS_OFFSET(s0)(sp)
-    REG_L    s1, SBI_TRAP_REGS_OFFSET(s1)(sp)
-    REG_L    a0, SBI_TRAP_REGS_OFFSET(a0)(sp)
-    REG_L    a1, SBI_TRAP_REGS_OFFSET(a1)(sp)
-    REG_L    a2, SBI_TRAP_REGS_OFFSET(a2)(sp)
-    REG_L    a3, SBI_TRAP_REGS_OFFSET(a3)(sp)
-    REG_L    a4, SBI_TRAP_REGS_OFFSET(a4)(sp)
-    REG_L    a5, SBI_TRAP_REGS_OFFSET(a5)(sp)
-    REG_L    a6, SBI_TRAP_REGS_OFFSET(a6)(sp)
-    REG_L    a7, SBI_TRAP_REGS_OFFSET(a7)(sp)
-    REG_L    s2, SBI_TRAP_REGS_OFFSET(s2)(sp)
-    REG_L    s3, SBI_TRAP_REGS_OFFSET(s3)(sp)
-    REG_L    s4, SBI_TRAP_REGS_OFFSET(s4)(sp)
-    REG_L    s5, SBI_TRAP_REGS_OFFSET(s5)(sp)
-    REG_L    s6, SBI_TRAP_REGS_OFFSET(s6)(sp)
-    REG_L    s7, SBI_TRAP_REGS_OFFSET(s7)(sp)
-    REG_L    s8, SBI_TRAP_REGS_OFFSET(s8)(sp)
-    REG_L    s9, SBI_TRAP_REGS_OFFSET(s9)(sp)
-    REG_L    s10, SBI_TRAP_REGS_OFFSET(s10)(sp)
-    REG_L    s11, SBI_TRAP_REGS_OFFSET(s11)(sp)
-    REG_L    t3, SBI_TRAP_REGS_OFFSET(t3)(sp)
-    REG_L    t4, SBI_TRAP_REGS_OFFSET(t4)(sp)
-    REG_L    t5, SBI_TRAP_REGS_OFFSET(t5)(sp)
-    REG_L    t6, SBI_TRAP_REGS_OFFSET(t6)(sp)
+    /* Restore all general regisers except A0 and T0 */
+    REG_L    ra, SBI_TRAP_REGS_OFFSET(ra)(a0)
+    REG_L    sp, SBI_TRAP_REGS_OFFSET(sp)(a0)
+    REG_L    gp, SBI_TRAP_REGS_OFFSET(gp)(a0)
+    REG_L    tp, SBI_TRAP_REGS_OFFSET(tp)(a0)
+    REG_L    t1, SBI_TRAP_REGS_OFFSET(t1)(a0)
+    REG_L    t2, SBI_TRAP_REGS_OFFSET(t2)(a0)
+    REG_L    s0, SBI_TRAP_REGS_OFFSET(s0)(a0)
+    REG_L    s1, SBI_TRAP_REGS_OFFSET(s1)(a0)
+    REG_L    a1, SBI_TRAP_REGS_OFFSET(a1)(a0)
+    REG_L    a2, SBI_TRAP_REGS_OFFSET(a2)(a0)
+    REG_L    a3, SBI_TRAP_REGS_OFFSET(a3)(a0)
+    REG_L    a4, SBI_TRAP_REGS_OFFSET(a4)(a0)
+    REG_L    a5, SBI_TRAP_REGS_OFFSET(a5)(a0)
+    REG_L    a6, SBI_TRAP_REGS_OFFSET(a6)(a0)
+    REG_L    a7, SBI_TRAP_REGS_OFFSET(a7)(a0)
+    REG_L    s2, SBI_TRAP_REGS_OFFSET(s2)(a0)
+    REG_L    s3, SBI_TRAP_REGS_OFFSET(s3)(a0)
+    REG_L    s4, SBI_TRAP_REGS_OFFSET(s4)(a0)
+    REG_L    s5, SBI_TRAP_REGS_OFFSET(s5)(a0)
+    REG_L    s6, SBI_TRAP_REGS_OFFSET(s6)(a0)
+    REG_L    s7, SBI_TRAP_REGS_OFFSET(s7)(a0)
+    REG_L    s8, SBI_TRAP_REGS_OFFSET(s8)(a0)
+    REG_L    s9, SBI_TRAP_REGS_OFFSET(s9)(a0)
+    REG_L    s10, SBI_TRAP_REGS_OFFSET(s10)(a0)
+    REG_L    s11, SBI_TRAP_REGS_OFFSET(s11)(a0)
+    REG_L    t3, SBI_TRAP_REGS_OFFSET(t3)(a0)
+    REG_L    t4, SBI_TRAP_REGS_OFFSET(t4)(a0)
+    REG_L    t5, SBI_TRAP_REGS_OFFSET(t5)(a0)
+    REG_L    t6, SBI_TRAP_REGS_OFFSET(t6)(a0)
 
     /* Restore MEPC and MSTATUS CSRs */
-    REG_L    t0, SBI_TRAP_REGS_OFFSET(mepc)(sp)
-    csrw    CSR_MEPC, t0
-    REG_L    t0, SBI_TRAP_REGS_OFFSET(mstatus)(sp)
+    REG_L    t0, SBI_TRAP_REGS_OFFSET(mstatus)(a0)
     csrw    CSR_MSTATUS, t0
-#if __riscv_xlen == 32
-    csrr    t0, CSR_MISA
-    srli    t0, t0, ('H' - 'A')
-    andi    t0, t0, 0x1
-    beq    t0, zero, _skip_mstatush_restore
-    REG_L    t0, SBI_TRAP_REGS_OFFSET(mstatusH)(sp)
-    csrw    CSR_MSTATUSH, t0
-_skip_mstatush_restore:
-#endif
+    REG_L    t0, SBI_TRAP_REGS_OFFSET(mepc)(a0)
+    csrw    CSR_MEPC, t0
 
     /* Restore T0 */
-    REG_L    t0, SBI_TRAP_REGS_OFFSET(t0)(sp)
+    REG_L    t0, SBI_TRAP_REGS_OFFSET(t0)(a0)
 
-    /* Restore SP */
-    REG_L    sp, SBI_TRAP_REGS_OFFSET(sp)(sp)
+    /* Restore A0 */
+    REG_L    a0, SBI_TRAP_REGS_OFFSET(a0)(a0)
 
     mret
