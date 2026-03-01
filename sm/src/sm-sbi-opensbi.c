@@ -15,9 +15,8 @@
 #include "cpu.h"
 
 static int sbi_ecall_keystone_enclave_handler(unsigned long extid, unsigned long funcid,
-                     const struct sbi_trap_regs *regs,
-                     unsigned long *out_val,
-                     struct sbi_trap_info *out_trap)
+                     struct sbi_trap_regs *regs,
+                     struct sbi_ecall_return *out)
 {
   uintptr_t retval;
 
@@ -35,7 +34,7 @@ static int sbi_ecall_keystone_enclave_handler(unsigned long extid, unsigned long
 
   switch (funcid) {
     case SBI_SM_CREATE_ENCLAVE:
-      retval = sbi_sm_create_enclave(out_val, regs->a0);
+      retval = sbi_sm_create_enclave(&out->value, regs->a0);
       break;
     case SBI_SM_DESTROY_ENCLAVE:
       retval = sbi_sm_destroy_enclave(regs->a0);
@@ -49,7 +48,7 @@ static int sbi_ecall_keystone_enclave_handler(unsigned long extid, unsigned long
       __builtin_unreachable();
       break;
     case SBI_SM_RANDOM:
-      *out_val = sbi_sm_random();
+      out->value = sbi_sm_random();
       retval = 0;
       break;
     case SBI_SM_ATTEST_ENCLAVE:
