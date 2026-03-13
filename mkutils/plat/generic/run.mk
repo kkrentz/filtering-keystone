@@ -14,7 +14,7 @@ QEMU_FLAGS := -m $(QEMU_MEM) -smp $(QEMU_SMP) -nographic \
                 -machine virt,rom=$(BUILDROOT_BUILDDIR)/images/bootrom.bin \
                 -bios $(BUILDROOT_BUILDDIR)/images/fw_jump.elf \
                 -kernel $(BUILDROOT_BUILDDIR)/images/Image \
-                -drive file=$(BUILDROOT_BUILDDIR)/images/rootfs.ext2,format=raw,id=hd0 \
+                -drive file=$(BUILDROOT_BUILDDIR)/images/rootfs.ext2,format=raw,id=hd0,if=none \
                 -device virtio-blk-device,drive=hd0 \
                 -append "console=ttyS0 ro root=/dev/vda" \
                 -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
