@@ -1,5 +1,5 @@
 diff --git a/hw/riscv/boot.c b/hw/riscv/boot.c
-index ebd351c840..7fe4b756bf 100644
+index 75f34287ff..44562e2646 100644
 --- a/hw/riscv/boot.c
 +++ b/hw/riscv/boot.c
 @@ -26,6 +26,7 @@
@@ -8,9 +8,9 @@ index ebd351c840..7fe4b756bf 100644
  #include "hw/riscv/boot_opensbi.h"
 +#include "hw/riscv/virt.h"
  #include "elf.h"
- #include "sysemu/device_tree.h"
- #include "sysemu/qtest.h"
-@@ -294,41 +295,75 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
+ #include "system/device_tree.h"
+ #include "system/qtest.h"
+@@ -438,6 +439,39 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
      int i;
      uint32_t start_addr_hi32 = 0x00000000;
      uint32_t fdt_load_addr_hi32 = 0x00000000;
@@ -45,93 +45,17 @@ index ebd351c840..7fe4b756bf 100644
 +        fdt_loc = ((fdt_loc + 0x4 - 1) & ~(0x4 - 1));
 +        rom_add_blob_fixed_as("mrom.fdt", machine->fdt, fdt_totalsize(machine->fdt),
 +                                fdt_loc, &address_space_memory);
++        return;
++    }
  
--    if (!riscv_is_32bit(harts)) {
--        start_addr_hi32 = start_addr >> 32;
--        fdt_load_addr_hi32 = fdt_load_addr >> 32;
--    }
--    /* reset vector */
--    uint32_t reset_vec[10] = {
--        0x00000297,                  /* 1:  auipc  t0, %pcrel_hi(fw_dyn) */
--        0x02828613,                  /*     addi   a2, t0, %pcrel_lo(1b) */
--        0xf1402573,                  /*     csrr   a0, mhartid  */
--        0,
--        0,
--        0x00028067,                  /*     jr     t0 */
--        start_addr,                  /* start: .dword */
--        start_addr_hi32,
--        fdt_load_addr,               /* fdt_laddr: .dword */
--        fdt_load_addr_hi32,
--                                     /* fw_dyn: */
--    };
--    if (riscv_is_32bit(harts)) {
--        reset_vec[3] = 0x0202a583;   /*     lw     a1, 32(t0) */
--        reset_vec[4] = 0x0182a283;   /*     lw     t0, 24(t0) */
-     } else {
--        reset_vec[3] = 0x0202b583;   /*     ld     a1, 32(t0) */
--        reset_vec[4] = 0x0182b283;   /*     ld     t0, 24(t0) */
--    }
- 
--    /* copy in the reset vector in little_endian byte order */
--    for (i = 0; i < ARRAY_SIZE(reset_vec); i++) {
--        reset_vec[i] = cpu_to_le32(reset_vec[i]);
-+        if (!riscv_is_32bit(harts)) {
-+            start_addr_hi32 = start_addr >> 32;
-+            fdt_load_addr_hi32 = fdt_load_addr >> 32;
-+        }
-+        /* reset vector */
-+        uint32_t reset_vec[10] = {
-+            0x00000297,                  /* 1:  auipc  t0, %pcrel_hi(fw_dyn) */
-+            0x02828613,                  /*     addi   a2, t0, %pcrel_lo(1b) */
-+            0xf1402573,                  /*     csrr   a0, mhartid  */
-+            0,
-+            0,
-+            0x00028067,                  /*     jr     t0 */
-+            start_addr,                  /* start: .dword */
-+            start_addr_hi32,
-+            fdt_load_addr,               /* fdt_laddr: .dword */
-+            fdt_load_addr_hi32,
-+                                         /* fw_dyn: */
-+        };
-+        if (riscv_is_32bit(harts)) {
-+            reset_vec[3] = 0x0202a583;   /*     lw     a1, 32(t0) */
-+            reset_vec[4] = 0x0182a283;   /*     lw     t0, 24(t0) */
-+        } else {
-+            reset_vec[3] = 0x0202b583;   /*     ld     a1, 32(t0) */
-+            reset_vec[4] = 0x0182b283;   /*     ld     t0, 24(t0) */
-+        }
-+
-+        /* copy in the reset vector in little_endian byte order */
-+        for (i = 0; i < ARRAY_SIZE(reset_vec); i++) {
-+            reset_vec[i] = cpu_to_le32(reset_vec[i]);
-+        }
-+        rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
-+                              rom_base, &address_space_memory);
-+        riscv_rom_copy_firmware_info(machine, rom_base, rom_size, sizeof(reset_vec),
-+                                  kernel_entry);
-     }
--    rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
--                          rom_base, &address_space_memory);
--    riscv_rom_copy_firmware_info(machine, rom_base, rom_size, sizeof(reset_vec),
--                                 kernel_entry);
- }
- 
- void riscv_setup_direct_kernel(hwaddr kernel_addr, hwaddr fdt_addr)
+     if (!riscv_is_32bit(harts)) {
+         start_addr_hi32 = start_addr >> 32;
 diff --git a/hw/riscv/virt.c b/hw/riscv/virt.c
-index a5bc7353b4..4d89386c1a 100644
+index 17909206c7..b779f61bbc 100644
 --- a/hw/riscv/virt.c
 +++ b/hw/riscv/virt.c
-@@ -74,7 +74,7 @@
- 
- static const MemMapEntry virt_memmap[] = {
-     [VIRT_DEBUG] =        {        0x0,         0x100 },
--    [VIRT_MROM] =         {     0x1000,        0xf000 },
-+    [VIRT_MROM] =         {     0x1000,        0x40000 },
-     [VIRT_TEST] =         {   0x100000,        0x1000 },
-     [VIRT_RTC] =          {   0x101000,        0x1000 },
-     [VIRT_CLINT] =        {  0x2000000,       0x10000 },
-@@ -1608,6 +1608,20 @@ static void virt_set_aclint(Object *obj, bool value, Error **errp)
-     s->have_aclint = value;
+@@ -1872,6 +1872,20 @@ static void virt_set_acpi(Object *obj, Visitor *v, const char *name,
+     visit_type_OnOffAuto(v, name, &s->acpi, errp);
  }
  
 +static char *virt_get_rom(Object *obj, Error **errp)
@@ -151,24 +75,25 @@ index a5bc7353b4..4d89386c1a 100644
  static HotplugHandler *virt_machine_get_hotplug_handler(MachineState *machine,
                                                          DeviceState *dev)
  {
-@@ -1679,6 +1693,9 @@ static void virt_machine_class_init(ObjectClass *oc, void *data)
-     sprintf(str, "Set number of guest MMIO pages for AIA IMSIC. Valid value "
-                  "should be between 0 and %d.", VIRT_IRQCHIP_MAX_GUESTS);
-     object_class_property_set_description(oc, "aia-guests", str);
+@@ -1959,6 +1973,10 @@ static void virt_machine_class_init(ObjectClass *oc, const void *data)
+     object_class_property_add_str(oc, "aia-guests",
+                                   virt_get_aia_guests,
+                                   virt_set_aia_guests);
 +
 +    object_class_property_add_str(oc, "rom", virt_get_rom, virt_set_rom);
 +    object_class_property_set_description(oc, "rom", "ROM image");
- }
- 
- static const TypeInfo virt_machine_typeinfo = {
++
+     {
+         g_autofree char *str =
+             g_strdup_printf("Set number of guest MMIO pages for AIA IMSIC. "
 diff --git a/include/hw/riscv/virt.h b/include/hw/riscv/virt.h
-index be4ab8fe7f..9db8062d11 100644
+index 7b4c2c8b7d..ff59606805 100644
 --- a/include/hw/riscv/virt.h
 +++ b/include/hw/riscv/virt.h
-@@ -56,6 +56,7 @@ struct RISCVVirtState {
-     bool have_aclint;
-     RISCVVirtAIAType aia_type;
-     int aia_guests;
+@@ -64,6 +64,7 @@ struct RISCVVirtState {
+     struct GPEXHost *gpex_host;
+     OnOffAuto iommu_sys;
+     uint16_t pci_iommu_bdf;
 +    char *rom;
  };
  
