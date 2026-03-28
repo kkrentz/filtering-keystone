@@ -10,6 +10,9 @@ else
 	WITH_TINY_DICE = 0
 endif
 
+GUESSED_CC_ABI := $(shell TMP=`$(CC) -v 2>&1 | sed -n 's/.*\(with\-abi=\([a-zA-Z0-9]*\)\).*/\2/p'`; echo $${TMP})
+GUESSED_CC_ISA := $(shell TMP=`$(CC) -v 2>&1 | sed -n 's/.*\(with\-arch=\([a-zA-Z0-9]*\)\).*/\2/p'`; echo $${TMP})
+
 override CFLAGS := \
 	-DKEYSTONE_BOOTLOADER=1 \
 	-DuECC_ENABLE_VLI_API=1 \
@@ -20,6 +23,8 @@ override CFLAGS := \
 	-DuECC_SUPPORTS_secp256r1=1 \
 	-DuECC_SUPPORTS_secp256k1=0 \
 	-DWITH_TINY_DICE=${WITH_TINY_DICE} \
+	-mabi=${GUESSED_CC_ABI} \
+	-march=${GUESSED_CC_ISA} \
 	-mcmodel=medany \
 	-nostdlib -nostartfiles -fno-common -std=gnu11 \
 	-static \
